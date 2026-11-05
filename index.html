@@ -464,11 +464,15 @@ var arcoStore = {
     overflow: hidden;
   }
 
+  /* Scaled rather than resized, so moving it never triggers layout or
+     repaints the blurred bar behind it. */
   #bar {
     height: 100%;
-    width: 0%;
+    width: 100%;
     background: var(--tint, var(--accent));
-    transition: width 90ms linear;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    will-change: transform;
   }
 
   .player-main {
@@ -2386,7 +2390,8 @@ var arcoStore = {
 
   var state = {
     id: null, events: [], idx: 0, startAt: 0, span: 0,
-    tint: "#DE9639", raf: 0, timer: 0
+    tint: "#DE9639", raf: 0, timer: 0,
+    ri: 0, lead: null, paused: false
   };
 
   function volFromSlider() {
@@ -2497,6 +2502,8 @@ var arcoStore = {
     state.events = flat.events;
     state.span = flat.span;
     state.idx = 0;
+    state.ri = 0;
+    state.lead = null;
     state.tint = tint;
     state.startAt = ac.currentTime + 0.30;
 
@@ -2541,6 +2548,12 @@ var arcoStore = {
   var readout = document.getElementById("readout");
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* The trace is drawn at most 30 times a second and with at most one point
+     per two device pixels: past that a phone spends its frame budget on
+     lines nobody can tell apart, and the synthesis behind it starves. */
+  var SCOPE_MS = 1000 / 30;
+  var lastDraw = 0;
+
   function sizeScope() {
     var r = scope.getBoundingClientRect();
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -2576,36 +2589,44 @@ var arcoStore = {
     sctx.stroke();
   }
 
-  function frame() {
+  function frame(now) {
     state.raf = 0;
     if (!state.id) { drawFlat(); return; }
+    if (state.paused || document.hidden) return;
+
+    state.raf = requestAnimationFrame(frame);
+    if (now && now - lastDraw < SCOPE_MS - 2) return;
+    lastDraw = now || 0;
 
     if (!reduced) {
       analyser.getByteTimeDomainData(scopeData);
       var w = scope.width, h = scope.height;
+      var n = scopeData.length;
+      var pts = Math.max(2, Math.min(n, Math.ceil(w / 2)));
+      var stride = n / pts;
+      var step = w / (pts - 1);
       sctx.clearRect(0, 0, w, h);
       sctx.lineWidth = Math.max(1.4, w / 700);
       sctx.strokeStyle = state.tint;
       sctx.beginPath();
-      var step = w / scopeData.length;
-      for (var i = 0; i < scopeData.length; i++) {
-        var y = (1 - (scopeData[i] - 128) / 128 * 0.86) * h / 2;
+      for (var i = 0; i < pts; i++) {
+        var y = (1 - (scopeData[Math.floor(i * stride)] - 128) / 128 * 0.86) * h / 2;
         if (i === 0) sctx.moveTo(0, y); else sctx.lineTo(i * step, y);
       }
       sctx.stroke();
     }
 
-    /* Progress, and the note currently under the bow. */
+    /* Progress, and the note currently under the bow. Events are sorted, so
+       a cursor walks forward instead of rescanning the piece every frame. */
     var el = ac.currentTime - state.startAt;
     var pct = Math.max(0, Math.min(1, el / state.span));
-    bar.style.width = (pct * 100).toFixed(2) + "%";
+    bar.style.transform = "scaleX(" + pct.toFixed(4) + ")";
 
-    var cur = null;
-    for (var k = 0; k < state.events.length; k++) {
-      var e = state.events[k];
-      if (e.lead && e.t <= el && el < e.t + e.dur + 0.06) cur = e;
-      if (e.t > el) break;
+    while (state.ri < state.events.length && state.events[state.ri].t <= el) {
+      if (state.events[state.ri].lead) state.lead = state.events[state.ri];
+      state.ri++;
     }
+    var cur = state.lead && el < state.lead.t + state.lead.dur + 0.06 ? state.lead : null;
     if (cur) {
       var label = nameOf(cur.midi, false);
       if (readout.textContent !== label) {
@@ -2613,8 +2634,6 @@ var arcoStore = {
         readout.classList.remove("idle");
       }
     }
-
-    state.raf = requestAnimationFrame(frame);
   }
 
   function paintPlaying(track) {
@@ -2634,7 +2653,7 @@ var arcoStore = {
   function paintIdle(quiet) {
     if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; }
     drawFlat();
-    bar.style.width = "0%";
+    bar.style.transform = "scaleX(0)";
     readout.textContent = "\u2014";
     readout.classList.add("idle");
     scopeTag.textContent = "Silent";
@@ -2953,7 +2972,11 @@ var arcoStore = {
   }
   if (window.ResizeObserver) new ResizeObserver(fitBar).observe(playerEl);
 
-  window.addEventListener("resize", function () { sizeScope(); fitBar(); });
+  var resizeRaf = 0;
+  window.addEventListener("resize", function () {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; sizeScope(); fitBar(); });
+  });
   sizeScope();
   fitBar();
   applyFilter();
