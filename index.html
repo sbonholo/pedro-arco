@@ -1,5 +1,59 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0E0D">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Arco: bowed strings simulated from their physics. Cello, violin, viola, double bass and string orchestra.">
+<meta name="claude:viewport-fit-sides" content="cover">
 <title>Arco</title>
+<script>
+/* Some hosts wrap this page in their own skeleton; keep the language. */
+document.documentElement.lang = "en";
+
+/* Installed first so a failure anywhere below still leaves the listener a
+   way out. One small toast, shown once; tapping it reloads. */
+(function () {
+  var shown = false, pending = false;
+  function toast() {
+    if (shown) return;
+    if (!document.body) { pending = true; return; }
+    shown = true;
+    var t = document.createElement("button");
+    t.type = "button";
+    t.className = "oops";
+    t.setAttribute("role", "alert");
+    t.textContent = "Something went wrong \u2013 tap to reload";
+    t.addEventListener("click", function () { location.reload(); });
+    document.body.appendChild(t);
+  }
+  window.onerror = function (msg) {
+    /* Layout-observer notices are benign and fire in some hosts. */
+    if (/ResizeObserver loop/.test(String(msg))) return false;
+    toast();
+    return false;
+  };
+  window.addEventListener("unhandledrejection", function () { toast(); });
+  window.addEventListener("DOMContentLoaded", function () {
+    if (pending) toast();
+  });
+})();
+
+/* Storage can be missing, full or blocked (private mode, sandboxed frames),
+   and none of that is allowed to stop the music. */
+var arcoStore = {
+  get: function (k, fallback) {
+    try {
+      var v = window.localStorage.getItem("arco:" + k);
+      return v === null ? fallback : JSON.parse(v);
+    } catch (e) { return fallback; }
+  },
+  set: function (k, v) {
+    try { window.localStorage.setItem("arco:" + k, JSON.stringify(v)); } catch (e) {}
+  }
+};
+</script>
 
 <style>
   :root {
@@ -32,6 +86,8 @@
     --mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", Consolas, monospace;
 
     --bar-h: 108px;
+
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -54,7 +110,7 @@
   .wrap {
     max-width: 720px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
   }
 
   /* ---------------------------------------------------------------- hero */
@@ -397,7 +453,11 @@
   .player-inner {
     max-width: 720px;
     margin: 0 auto;
-    padding: 12px 20px 14px;
+    /* viewport-fit=cover lets the page run under the notch and home bar,
+       so the controls keep clear of both. */
+    padding: 12px max(20px, env(safe-area-inset-right))
+             calc(14px + env(safe-area-inset-bottom))
+             max(20px, env(safe-area-inset-left));
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -410,11 +470,15 @@
     overflow: hidden;
   }
 
+  /* Scaled rather than resized, so moving it never triggers layout or
+     repaints the blurred bar behind it. */
   #bar {
     height: 100%;
-    width: 0%;
+    width: 100%;
     background: var(--tint, var(--accent));
-    transition: width 90ms linear;
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    will-change: transform;
   }
 
   .player-main {
@@ -476,6 +540,23 @@
   .stop:disabled { opacity: 0.32; cursor: default; }
   .stop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .stop svg { display: block; }
+
+  .fav svg path { fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+  .fav[aria-pressed="true"] { color: var(--tint, var(--accent)); border-color: var(--tint, var(--accent)); }
+  .fav[aria-pressed="true"] svg path { fill: currentColor; }
+
+  .chip[hidden], .key.is-hidden { display: none; }
+  .chip[data-inst="fav"] .swatch { background: var(--text); }
+
+  /* A saved piece carries a small star after its title. */
+  .row[data-fav="true"] .what::after,
+  .key[data-fav="true"] .name::after {
+    content: "\2605";
+    font-size: 0.6em;
+    margin-left: 0.5em;
+    vertical-align: 0.3em;
+    color: var(--tint);
+  }
 
   .dials {
     display: flex;
@@ -554,6 +635,26 @@
 
   footer p { margin: 0 0 8px; max-width: 60ch; }
 
+  .oops {
+    position: fixed;
+    left: 50%;
+    top: calc(14px + env(safe-area-inset-top));
+    transform: translateX(-50%);
+    z-index: 60;
+    max-width: calc(100% - 32px);
+    min-height: 44px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    background: var(--panel-hi);
+    border: 1px solid var(--cello);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
+
   .sr {
     position: absolute; width: 1px; height: 1px;
     padding: 0; margin: -1px; overflow: hidden;
@@ -569,10 +670,50 @@
     .dials { gap: 10px; }
   }
 
+  /* Phones and other touch screens: every control is at least a 44px target
+     and no text drops below 12px. The labels keep their mono small-caps
+     voice; they just stop being squinted at. */
+  @media (max-width: 560px), (pointer: coarse) {
+    .wordmark .gloss,
+    .scope-tag,
+    .chip,
+    .tab,
+    .section-head .note,
+    .row .who,
+    .row .meta,
+    .key .range,
+    .now .who,
+    .dial label,
+    .dial output,
+    footer { font-size: 12px; }
+
+    .chip, .tab { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+    .chip { padding-left: 16px; padding-right: 16px; }
+    .filters { gap: 8px 8px; }
+
+    input[type="range"] { height: 44px; }
+    input[type="range"]::-webkit-slider-thumb {
+      width: 20px; height: 20px; margin-top: -9.5px;
+    }
+    input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+
+    .key { min-height: 56px; }
+  }
+
+  @media (max-width: 560px) {
+    /* Two sliders side by side left each about 60px of travel on a phone. */
+    .dial { flex-basis: 100%; }
+    .dials { gap: 0 10px; }
+    .player-inner { gap: 4px; }
+    .player-main { gap: 8px; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
 </style>
+</head>
+<body>
 
 <div class="wrap">
 
@@ -603,6 +744,7 @@
     <button class="chip" data-filter="viola"  data-inst="viola"><span class="swatch"></span>Viola</button>
     <button class="chip" data-filter="bass"   data-inst="bass"><span class="swatch"></span>Bass</button>
     <button class="chip" data-filter="ens"    data-inst="ens"><span class="swatch"></span>Orchestra</button>
+    <button class="chip" data-filter="fav" data-inst="fav" hidden><span class="swatch"></span>Saved</button>
   </div>
 
   <main id="library"></main>
@@ -652,6 +794,16 @@
         <span class="what" id="nowWhat">Press any title to play</span>
       </div>
       <div class="readout idle" id="readout" aria-live="off">&#x2014;</div>
+      <button class="stop fav" id="fav" disabled aria-label="Save to favourites" aria-pressed="false">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <path d="M7 1.4l1.73 3.5 3.87.56-2.8 2.73.66 3.85L7 10.22l-3.46 1.82.66-3.85-2.8-2.73 3.87-.56z"></path>
+        </svg>
+      </button>
+      <button class="stop" id="toggle" disabled aria-label="Play">
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M2.5 1.2v9.6L10.6 6z" fill="currentColor"></path>
+        </svg>
+      </button>
       <button class="stop" id="stop" disabled aria-label="Stop">
         <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
           <rect width="12" height="12" rx="1.5" fill="currentColor"></rect>
@@ -2273,8 +2425,26 @@
 
   var state = {
     id: null, events: [], idx: 0, startAt: 0, span: 0,
-    tint: "#DE9639", raf: 0, timer: 0
+    tint: "#DE9639", raf: 0, timer: 0,
+    ri: 0, lead: null, paused: false, autoPaused: false,
+    pending: null, savedAt: 0, posAt: 0
   };
+
+  /* Favourites, by stable track id. */
+  var favs = arcoStore.get("favs", []);
+  if (!Array.isArray(favs)) favs = [];
+  function isFav(id) { return !!id && favs.indexOf(id) >= 0; }
+
+  /* Where the listener got to, so a reload offers to pick up from there. */
+  function savePos(id, at) {
+    id = id || state.id;
+    if (!id) return;
+    if (at === undefined) {
+      at = ac && state.id === id ? Math.max(0, ac.currentTime - state.startAt) : 0;
+    }
+    state.savedAt = ac ? ac.currentTime : 0;
+    arcoStore.set("last", { id: id, at: at, of: state.span || 0 });
+  }
 
   function volFromSlider() {
     var el = document.getElementById("vol");
@@ -2370,22 +2540,37 @@
     state.id = null;
     state.events = [];
     state.idx = 0;
+    state.paused = false;
+    state.autoPaused = false;
     paintIdle(quiet);
   }
 
-  function play(track, id, tint) {
+  /* Promises from suspend/resume can reject on some browsers; that is never
+     worth an error toast. */
+  function quiet(p) { if (p && p.catch) p.catch(function () {}); }
+
+  /* `from` is how far into the piece to begin, as a fraction, so a saved
+     position survives a tempo change. Notes already begun are skipped. */
+  function play(track, id, tint, from) {
     initAudio();
-    if (ac.state === "suspended") ac.resume();
+    if (ac.state === "suspended") quiet(ac.resume());
 
     stopAll(true);
 
     var flat = flatten(track);
+    var at = Math.max(0, Math.min((from || 0) * flat.span, flat.span - 0.5));
     state.id = id;
     state.events = flat.events;
     state.span = flat.span;
     state.idx = 0;
+    while (state.idx < state.events.length && state.events[state.idx].t < at) state.idx++;
+    state.ri = state.idx;
+    state.lead = null;
     state.tint = tint;
-    state.startAt = ac.currentTime + 0.30;
+    state.paused = false;
+    state.autoPaused = false;
+    state.pending = null;
+    state.startAt = ac.currentTime + 0.30 - at;
 
     /* A singing movement wants more hall than a running baroque one. */
     wet.gain.setTargetAtTime(0.40 * STYLE[track.style || "baroque"].wet,
@@ -2397,10 +2582,11 @@
     state.timer = setInterval(tick, 25);
     tick();
     if (!state.raf) state.raf = requestAnimationFrame(frame);
+    onPlaying(track);
   }
 
   function tick() {
-    if (!state.id) return;
+    if (!state.id || state.paused) return;
     var horizon = ac.currentTime + 0.45;
     while (state.idx < state.events.length &&
            state.startAt + state.events[state.idx].t < horizon) {
@@ -2415,8 +2601,12 @@
 
     if (state.idx >= state.events.length &&
         ac.currentTime > state.startAt + state.span + 1.4) {
+      var doneId = state.id;
       stopAll(false);
+      savePos(doneId, 0);
+      return;
     }
+    if (now - state.savedAt > 2) savePos();
   }
 
   /* ================================================================== view */
@@ -2427,6 +2617,12 @@
   var bar = document.getElementById("bar");
   var readout = document.getElementById("readout");
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* The trace is drawn at most 30 times a second and with at most one point
+     per two device pixels: past that a phone spends its frame budget on
+     lines nobody can tell apart, and the synthesis behind it starves. */
+  var SCOPE_MS = 1000 / 30;
+  var lastDraw = 0;
 
   function sizeScope() {
     var r = scope.getBoundingClientRect();
@@ -2463,36 +2659,46 @@
     sctx.stroke();
   }
 
-  function frame() {
+  function frame(now) {
     state.raf = 0;
     if (!state.id) { drawFlat(); return; }
+    if (state.paused || document.hidden) return;
 
+    state.raf = requestAnimationFrame(frame);
+    if (now && now - lastDraw < SCOPE_MS - 2) return;
+    lastDraw = now || 0;
+
+    now = now || performance.now();
     if (!reduced) {
       analyser.getByteTimeDomainData(scopeData);
       var w = scope.width, h = scope.height;
+      var n = scopeData.length;
+      var pts = Math.max(2, Math.min(n, Math.ceil(w / 2)));
+      var stride = n / pts;
+      var step = w / (pts - 1);
       sctx.clearRect(0, 0, w, h);
       sctx.lineWidth = Math.max(1.4, w / 700);
       sctx.strokeStyle = state.tint;
       sctx.beginPath();
-      var step = w / scopeData.length;
-      for (var i = 0; i < scopeData.length; i++) {
-        var y = (1 - (scopeData[i] - 128) / 128 * 0.86) * h / 2;
+      for (var i = 0; i < pts; i++) {
+        var y = (1 - (scopeData[Math.floor(i * stride)] - 128) / 128 * 0.86) * h / 2;
         if (i === 0) sctx.moveTo(0, y); else sctx.lineTo(i * step, y);
       }
       sctx.stroke();
     }
 
-    /* Progress, and the note currently under the bow. */
+    /* Progress, and the note currently under the bow. Events are sorted, so
+       a cursor walks forward instead of rescanning the piece every frame. */
     var el = ac.currentTime - state.startAt;
     var pct = Math.max(0, Math.min(1, el / state.span));
-    bar.style.width = (pct * 100).toFixed(2) + "%";
+    bar.style.transform = "scaleX(" + pct.toFixed(4) + ")";
+    if (now - state.posAt > 1000) { state.posAt = now; mediaPosition(); }
 
-    var cur = null;
-    for (var k = 0; k < state.events.length; k++) {
-      var e = state.events[k];
-      if (e.lead && e.t <= el && el < e.t + e.dur + 0.06) cur = e;
-      if (e.t > el) break;
+    while (state.ri < state.events.length && state.events[state.ri].t <= el) {
+      if (state.events[state.ri].lead) state.lead = state.events[state.ri];
+      state.ri++;
     }
+    var cur = state.lead && el < state.lead.t + state.lead.dur + 0.06 ? state.lead : null;
     if (cur) {
       var label = nameOf(cur.midi, false);
       if (readout.textContent !== label) {
@@ -2500,8 +2706,6 @@
         readout.classList.remove("idle");
       }
     }
-
-    state.raf = requestAnimationFrame(frame);
   }
 
   function paintPlaying(track) {
@@ -2516,12 +2720,13 @@
       rows[i].setAttribute("aria-current", rows[i].dataset.track === state.id ? "true" : "false");
     }
     document.getElementById("announce").textContent = "Playing " + track.title + ", " + track.composer;
+    paintToggle();
   }
 
   function paintIdle(quiet) {
     if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; }
     drawFlat();
-    bar.style.width = "0%";
+    bar.style.transform = "scaleX(0)";
     readout.textContent = "\u2014";
     readout.classList.add("idle");
     scopeTag.textContent = "Silent";
@@ -2531,6 +2736,8 @@
     var rows = document.querySelectorAll("[data-track]");
     for (var i = 0; i < rows.length; i++) rows[i].setAttribute("aria-current", "false");
     if (!quiet) document.getElementById("announce").textContent = "Finished";
+    paintToggle();
+    if (navigator.mediaSession) navigator.mediaSession.playbackState = "none";
   }
 
   function fmt(sec) {
@@ -2582,7 +2789,7 @@
   PLAYERS.forEach(function (pl, i) {
     var track = byTitle[pl.piece];
     if (!track) return;                       /* never render a dead button */
-    var id = "pl-" + i;
+    var id = "pl:" + pl.name;
     registry[id] = track;
 
     var btn = document.createElement("button");
@@ -2646,7 +2853,7 @@
     rows.className = "rows";
 
     section.tracks.forEach(function (track, ti) {
-      var id = "t" + si + "-" + ti;
+      var id = "t:" + track.composer + "|" + track.title;
       registry[id] = track;
 
       var btn = document.createElement("button");
@@ -2751,7 +2958,8 @@
       b.type = "button";
       b.dataset.track = id;
       b.dataset.inst = scaleInst;
-      b.setAttribute("aria-current", "false");
+      b.setAttribute("aria-current", b.dataset.track === state.id ? "true" : "false");
+      b.dataset.fav = isFav(id) ? "true" : "false";
       b.style.setProperty("--tint", TINTS[scaleInst]);
 
       var nm = document.createElement("span");
@@ -2781,11 +2989,19 @@
   function applyFilter() {
     var rows = document.querySelectorAll(".row");
     for (var i = 0; i < rows.length; i++) {
-      rows[i].classList.toggle("is-hidden", filter !== "all" && rows[i].dataset.inst !== filter);
+      var hide = filter === "fav" ? !isFav(rows[i].dataset.track)
+                                  : filter !== "all" && rows[i].dataset.inst !== filter;
+      rows[i].classList.toggle("is-hidden", hide);
     }
     /* Scales follow the instrument tabs, so the section hides only when the
-       filter names an instrument the tabs are not showing. */
-    var scaleMatch = filter === "all" || filter === scaleInst;
+       filter names an instrument the tabs are not showing. Under Saved it
+       stays while any scale is saved, so the tabs can still reach it. */
+    var keys = keysHost.querySelectorAll(".key");
+    for (var q = 0; q < keys.length; q++) {
+      keys[q].classList.toggle("is-hidden", filter === "fav" && !isFav(keys[q].dataset.track));
+    }
+    var scaleMatch = filter === "all" || filter === scaleInst ||
+      (filter === "fav" && favs.some(function (f) { return f.indexOf("scale-") === 0; }));
     scaleSec.style.display = scaleMatch ? "" : "none";
 
     var secs = document.querySelectorAll(".section:not([data-scales])");
@@ -2795,20 +3011,24 @@
     }
   }
 
-  document.querySelectorAll(".chip").forEach(function (chip) {
-    chip.addEventListener("click", function () {
-      filter = chip.dataset.filter;
-      document.querySelectorAll(".chip").forEach(function (c) {
-        c.setAttribute("aria-pressed", c === chip ? "true" : "false");
-      });
-      applyFilter();
+  function setFilter(name) {
+    filter = name;
+    document.querySelectorAll(".chip").forEach(function (c) {
+      c.setAttribute("aria-pressed", c.dataset.filter === name ? "true" : "false");
     });
+    applyFilter();
+  }
+
+  document.querySelectorAll(".chip").forEach(function (chip) {
+    chip.addEventListener("click", function () { setFilter(chip.dataset.filter); });
   });
 
   /* --------------------------------------------------------------- dials */
 
   document.getElementById("stop").addEventListener("click", function () {
+    var was = state.id;
     stopAll(true);
+    if (was) savePos(was, 0);
   });
 
   var tempoEl = document.getElementById("tempo");
@@ -2817,6 +3037,7 @@
     tempoOut.textContent = tempoEl.value + "%";
   });
   tempoEl.addEventListener("change", function () {
+    arcoStore.set("tempo", parseInt(tempoEl.value, 10));
     /* Restart the current piece so the new tempo takes effect from the top. */
     if (state.id && registry[state.id]) {
       var t = registry[state.id];
@@ -2830,6 +3051,232 @@
     volOut.textContent = volEl.value;
     if (master) master.gain.setTargetAtTime(volFromSlider(), ac.currentTime, 0.02);
   });
+  volEl.addEventListener("change", function () {
+    arcoStore.set("vol", parseInt(volEl.value, 10));
+  });
+
+  /* --------------------------------------------------- pause and resume */
+
+  var toggleBtn = document.getElementById("toggle");
+  var favBtn = document.getElementById("fav");
+  var favChip = document.querySelector('.chip[data-filter="fav"]');
+  var ICON_PLAY = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
+                  '<path d="M2.5 1.2v9.6L10.6 6z" fill="currentColor"></path></svg>';
+  var ICON_PAUSE = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">' +
+                   '<rect x="1.5" y="1" width="3.2" height="10" rx="1" fill="currentColor"></rect>' +
+                   '<rect x="7.3" y="1" width="3.2" height="10" rx="1" fill="currentColor"></rect></svg>';
+
+  function currentId() { return state.id || (state.pending && state.pending.id) || null; }
+
+  function rowFor(id) {
+    var all = document.querySelectorAll("[data-track]");
+    for (var i = 0; i < all.length; i++) if (all[i].dataset.track === id) return all[i];
+    return null;
+  }
+
+  function tintOf(id) {
+    var el = rowFor(id);
+    return TINTS[(el && el.dataset.inst) || registry[id].inst];
+  }
+
+  function paintToggle() {
+    var sounding = !!state.id && !state.paused;
+    var label = sounding ? "Pause" : "Play";
+    if (toggleBtn.getAttribute("aria-label") !== label || !toggleBtn.dataset.painted) {
+      toggleBtn.innerHTML = sounding ? ICON_PAUSE : ICON_PLAY;
+      toggleBtn.setAttribute("aria-label", label);
+      toggleBtn.dataset.painted = "1";
+    }
+    toggleBtn.disabled = !currentId();
+    var id = currentId();
+    favBtn.disabled = !id;
+    favBtn.setAttribute("aria-pressed", isFav(id) ? "true" : "false");
+    favBtn.setAttribute("aria-label", isFav(id) ? "Remove from favourites" : "Save to favourites");
+  }
+
+  function pause() {
+    if (!state.id || state.paused) return;
+    state.paused = true;
+    savePos();
+    if (state.timer) { clearInterval(state.timer); state.timer = 0; }
+    if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; }
+    /* Suspending the context freezes its clock, so every note already
+       scheduled waits exactly where it was. */
+    quiet(ac.suspend());
+    scopeTag.textContent = "Paused";
+    paintToggle();
+    mediaPosition();
+    if (navigator.mediaSession) navigator.mediaSession.playbackState = "paused";
+  }
+
+  function resume() {
+    if (state.pending && !state.id) {
+      var p = state.pending;
+      play(registry[p.id], p.id, tintOf(p.id), p.frac);
+      return;
+    }
+    if (!state.id || !state.paused) return;
+    state.paused = false;
+    state.autoPaused = false;
+    quiet(ac.resume());
+    var t = registry[state.id];
+    scopeTag.textContent = INST[t.parts[0].inst].label + " · " + t.key;
+    state.timer = setInterval(tick, 25);
+    tick();
+    if (!state.raf) state.raf = requestAnimationFrame(frame);
+    paintToggle();
+    if (navigator.mediaSession) navigator.mediaSession.playbackState = "playing";
+  }
+
+  toggleBtn.addEventListener("click", function () {
+    if (state.id && !state.paused) pause(); else resume();
+  });
+
+  /* A hidden tab neither draws nor sounds; it picks up where it left off
+     when the listener comes back, unless they paused it themselves. */
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      if (state.id && !state.paused) { pause(); state.autoPaused = true; }
+      else savePos();
+    } else if (state.autoPaused) {
+      resume();
+    } else if (state.id && !state.paused && !state.raf) {
+      state.raf = requestAnimationFrame(frame);
+    }
+  });
+  window.addEventListener("pagehide", function () { if (state.id) savePos(); });
+
+  /* ----------------------------------------------------------- favourites */
+
+  function paintFavs() {
+    var all = document.querySelectorAll("[data-track]");
+    for (var i = 0; i < all.length; i++) {
+      all[i].dataset.fav = isFav(all[i].dataset.track) ? "true" : "false";
+    }
+    favChip.hidden = favs.length === 0;
+    if (filter === "fav" && !favs.length) setFilter("all"); else applyFilter();
+    paintToggle();
+  }
+
+  favBtn.addEventListener("click", function () {
+    var id = currentId();
+    if (!id) return;
+    var i = favs.indexOf(id);
+    if (i >= 0) favs.splice(i, 1); else favs.push(id);
+    arcoStore.set("favs", favs);
+    paintFavs();
+    document.getElementById("announce").textContent =
+      (i >= 0 ? "Removed from" : "Saved to") + " favourites";
+  });
+
+  /* -------------------------------------------------------- media session */
+
+  var artCache = {};
+  function artFor(tint) {
+    if (artCache[tint]) return artCache[tint];
+    var out = [];
+    try {
+      /* The bow mark on the dark ground, in the piece's varnish. */
+      var c = document.createElement("canvas");
+      c.width = c.height = 512;
+      var x = c.getContext("2d");
+      x.fillStyle = "#0B0E0D";
+      x.fillRect(0, 0, 512, 512);
+      x.shadowColor = tint;
+      x.shadowBlur = 48;
+      x.fillStyle = tint;
+      x.fillRect(244, 112, 24, 288);
+      out = [{ src: c.toDataURL("image/png"), sizes: "512x512", type: "image/png" }];
+    } catch (e) {}
+    artCache[tint] = out;
+    return out;
+  }
+
+  function mediaPosition() {
+    var ms = navigator.mediaSession;
+    if (!ms || !ms.setPositionState || !state.id || !(state.span > 0)) return;
+    try {
+      ms.setPositionState({
+        duration: state.span,
+        position: Math.max(0, Math.min(state.span, ac.currentTime - state.startAt)),
+        playbackRate: 1
+      });
+    } catch (e) {}
+  }
+
+  function onPlaying(track) {
+    savePos();
+    var ms = navigator.mediaSession;
+    if (!ms) return;
+    try {
+      ms.metadata = new window.MediaMetadata({
+        title: track.title,
+        artist: track.composer,
+        album: "Arco · " + INST[track.parts[0].inst].label,
+        artwork: artFor(state.tint)
+      });
+      ms.playbackState = "playing";
+    } catch (e) {}
+    mediaPosition();
+  }
+
+  /* Next and previous walk the list as it is currently filtered. */
+  function skip(dir) {
+    var list = Array.prototype.filter.call(document.querySelectorAll("[data-track]"),
+      function (el) { return el.getClientRects().length > 0; });
+    if (!list.length) return;
+    var i = list.indexOf(rowFor(currentId()));
+    var next = i < 0 ? list[0] : list[(i + dir + list.length) % list.length];
+    next.click();
+  }
+
+  if (navigator.mediaSession) {
+    var handlers = {
+      play: resume,
+      pause: pause,
+      stop: function () { document.getElementById("stop").click(); },
+      nexttrack: function () { skip(1); },
+      previoustrack: function () { skip(-1); },
+      seekto: function (d) {
+        if (!state.id || !(state.span > 0) || d.seekTime === undefined) return;
+        var t = registry[state.id];
+        play(t, state.id, state.tint, d.seekTime / state.span);
+      }
+    };
+    Object.keys(handlers).forEach(function (k) {
+      try { navigator.mediaSession.setActionHandler(k, handlers[k]); } catch (e) {}
+    });
+  }
+
+  /* -------------------------------------------------------------- restore */
+
+  (function restore() {
+    var v = arcoStore.get("vol", null);
+    if (typeof v === "number" && v >= 0 && v <= 100) { volEl.value = v; volOut.textContent = String(v); }
+    var tp = arcoStore.get("tempo", null);
+    if (typeof tp === "number" && tp >= 50 && tp <= 140) { tempoEl.value = tp; tempoOut.textContent = tp + "%"; }
+
+    var last = arcoStore.get("last", null);
+    if (last && typeof last.id === "string") {
+      var m = /^scale-(\w+)-(\w+)$/.exec(last.id);
+      if (m && !registry[last.id]) {
+        var tab = tabsHost.querySelector('[data-scale-inst="' + m[1] + '"]');
+        if (tab) tab.click();
+      }
+      var track = registry[last.id];
+      if (track) {
+        var frac = last.of > 0 ? last.at / last.of : 0;
+        if (!(frac > 0 && frac < 0.98)) frac = 0;
+        state.pending = { id: last.id, frac: frac };
+        document.documentElement.style.setProperty("--tint", tintOf(last.id));
+        document.getElementById("nowWho").textContent =
+          (frac > 0 ? "Resume · " : "Last played · ") + track.composer;
+        document.getElementById("nowWhat").textContent = track.title;
+        bar.style.transform = "scaleX(" + frac.toFixed(4) + ")";
+      }
+    }
+    paintFavs();
+  })();
 
   /* Keep the page clear of the player bar whatever height it settles at \u2014
      the dials wrap differently by viewport, so a fixed value would clip. */
@@ -2840,11 +3287,15 @@
   }
   if (window.ResizeObserver) new ResizeObserver(fitBar).observe(playerEl);
 
-  window.addEventListener("resize", function () { sizeScope(); fitBar(); });
+  var resizeRaf = 0;
+  window.addEventListener("resize", function () {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; sizeScope(); fitBar(); });
+  });
   sizeScope();
   fitBar();
   applyFilter();
 })();
 </script>
-
-</body></html>
+</body>
+</html>
