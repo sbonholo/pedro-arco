@@ -1,0 +1,2850 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>Arco</title>
+
+<style>
+  :root {
+    /* A darkened hall. Ground is near-black with a spruce-green bias, never
+       pure #000 &#x2014; the accents are instrument varnish under stage light. */
+    --ground:      #0B0E0D;
+    --ground-deep: #070908;
+    --panel:       #131817;
+    --panel-hi:    #1B2220;
+    --line:        #242E29;
+    --line-soft:   #1A211E;
+
+    --text:        #E9E4D8;
+    --text-dim:    #97A199;
+    --text-faint:  #626D67;
+
+    /* Register mapped to warmth: the lower the instrument, the deeper the
+       varnish. This is an encoding, not decoration. */
+    --bass:   #B4762F;
+    --cello:  #DE9639;
+    --viola:  #D6B45A;
+    --violin: #EFD98C;
+    --ens:    #8FA8B4;
+
+    --accent: var(--cello);
+
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+             "URW Palladio L", Georgia, serif;
+    --sans:  system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", Consolas, monospace;
+
+    --bar-h: 108px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    /* The artifact host paints its own ground behind the page, so this must
+       be explicit or the page borrows the host's theme. */
+    background: var(--ground);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: calc(var(--bar-h) + 32px);
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px;
+  }
+
+  /* ---------------------------------------------------------------- hero */
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 44px 0 30px;
+  }
+
+  .wordmark {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-size: 46px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin: 0;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .wordmark .gloss {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .lede {
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--text-dim);
+    max-width: 52ch;
+    margin: 0;
+  }
+
+  /* The oscilloscope is the thesis: it draws the actual synthesized signal. */
+  .scope-frame {
+    position: relative;
+    border: 1px solid var(--line);
+    background: var(--ground-deep);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  #scope { display: block; width: 100%; height: 96px; }
+
+  .scope-tag {
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    pointer-events: none;
+  }
+
+  /* ------------------------------------------------------------- filters */
+
+  .filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 4px 0 30px;
+  }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+  }
+
+  .chip:hover { border-color: var(--text-faint); color: var(--text); }
+
+  .chip[aria-pressed="true"] {
+    color: var(--ground);
+    background: var(--text);
+    border-color: var(--text);
+  }
+
+  .chip .swatch {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor;
+    flex: none;
+  }
+
+  .chip[data-inst="cello"]  .swatch { background: var(--cello); }
+  .chip[data-inst="violin"] .swatch { background: var(--violin); }
+  .chip[data-inst="viola"]  .swatch { background: var(--viola); }
+  .chip[data-inst="bass"]   .swatch { background: var(--bass); }
+  .chip[data-inst="ens"]    .swatch { background: var(--ens); }
+
+  /* ------------------------------------------------------------ sections */
+
+  .section { margin-bottom: 40px; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 4px;
+  }
+
+  .section-head h2 {
+    font-family: var(--serif);
+    font-size: 21px;
+    font-weight: 400;
+    margin: 0;
+    letter-spacing: 0.01em;
+  }
+
+  .section-head .note {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-left: auto;
+    text-align: right;
+  }
+
+  /* ---------------------------------------------------------------- rows */
+
+  .rows { display: flex; flex-direction: column; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--line-soft);
+    color: inherit;
+    font: inherit;
+    padding: 13px 10px 13px 6px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 120ms ease;
+  }
+
+  .row:hover { background: var(--panel); }
+
+  .row:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* The bow mark: a vertical stroke, the length of a down-bow, tinted to the
+     instrument's register. It fills when the piece is sounding. */
+  .bow {
+    width: 3px;
+    height: 26px;
+    border-radius: 2px;
+    background: var(--line);
+    justify-self: center;
+    transition: background 160ms ease, box-shadow 160ms ease;
+  }
+
+  .row[aria-current="true"] .bow {
+    background: var(--tint);
+    box-shadow: 0 0 12px -1px var(--tint);
+  }
+
+  .row .who {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: block;
+    margin-bottom: 3px;
+  }
+
+  .row[aria-current="true"] .who { color: var(--tint); }
+
+  .row .what {
+    font-family: var(--serif);
+    font-size: 17.5px;
+    line-height: 1.3;
+    color: var(--text);
+    display: block;
+  }
+
+  .row .meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+    text-align: right;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+
+  .row .meta .k { display: block; color: var(--text-dim); }
+
+  /* A player entry is a row that also carries a line about why they matter. */
+  .row .why {
+    display: block;
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--text-faint);
+    margin-top: 5px;
+    max-width: 54ch;
+  }
+
+  .row[aria-current="true"] .why { color: var(--text-dim); }
+
+  .row .meta .piece {
+    display: block;
+    font-family: var(--serif);
+    font-size: 12.5px;
+    letter-spacing: 0;
+    color: var(--text-dim);
+    max-width: 20ch;
+    white-space: normal;
+    margin-bottom: 2px;
+  }
+
+  @media (max-width: 560px) {
+    .row .meta .piece { display: none; }
+  }
+
+  .row.is-hidden { display: none; }
+
+  /* -------------------------------------------------------------- scales */
+
+  .scale-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 14px 0 14px;
+  }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--text-dim);
+    padding: 7px 13px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color 140ms ease, color 140ms ease;
+  }
+
+  .tab:hover { border-color: var(--text-faint); color: var(--text); }
+
+  .tab[aria-pressed="true"] {
+    border-color: var(--tint, var(--accent));
+    color: var(--tint, var(--accent));
+  }
+
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .keys {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+  }
+
+  .key {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 13px 12px;
+    cursor: pointer;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: border-color 140ms ease, background 140ms ease;
+  }
+
+  .key:hover { background: var(--panel-hi); border-color: var(--text-faint); }
+
+  .key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .key[aria-current="true"] { border-color: var(--tint); background: var(--panel-hi); }
+
+  .key .name {
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.1;
+  }
+
+  .key[aria-current="true"] .name { color: var(--tint); }
+
+  .key .range {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+  }
+
+  /* -------------------------------------------------------------- player */
+
+  .player {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: rgba(11, 14, 13, 0.94);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    z-index: 40;
+  }
+
+  .player-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 12px 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .progress {
+    height: 2px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  #bar {
+    height: 100%;
+    width: 0%;
+    background: var(--tint, var(--accent));
+    transition: width 90ms linear;
+  }
+
+  .player-main {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .now { flex: 1; min-width: 0; }
+
+  .now .who {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    display: block;
+  }
+
+  .now .what {
+    font-family: var(--serif);
+    font-size: 16px;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text);
+  }
+
+  /* Live note readout &#x2014; the whole reason a player practising scales would
+     keep this open. Fixed width so it never shifts the layout. */
+  .readout {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-variant-numeric: tabular-nums;
+    color: var(--tint, var(--text-faint));
+    min-width: 62px;
+    text-align: right;
+    letter-spacing: 0.02em;
+    flex: none;
+  }
+
+  .readout.idle { color: var(--text-faint); }
+
+  .stop {
+    flex: none;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: border-color 140ms ease, color 140ms ease;
+  }
+
+  .stop:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .stop:disabled { opacity: 0.32; cursor: default; }
+  .stop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .stop svg { display: block; }
+
+  .dials {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .dial {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: 1 1 150px;
+    min-width: 140px;
+  }
+
+  .dial label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    flex: none;
+  }
+
+  .dial output {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    flex: none;
+    min-width: 46px;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 20px;
+    background: transparent;
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 1px; background: var(--line);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 1px; background: var(--line);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--text-dim);
+    margin-top: -5.5px;
+    border: 0;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--text-dim);
+    border: 0;
+  }
+  input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* -------------------------------------------------------------- footer */
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 22px 0 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.75;
+    color: var(--text-faint);
+    letter-spacing: 0.02em;
+  }
+
+  footer p { margin: 0 0 8px; max-width: 60ch; }
+
+  .sr {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 36px; }
+    .lede { font-size: 16.5px; }
+    .row { grid-template-columns: 12px 1fr auto; gap: 11px; }
+    .row .what { font-size: 16px; }
+    .readout { font-size: 18px; min-width: 54px; }
+    .dials { gap: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="wordmark">
+      <h1>Arco</h1>
+      <span class="gloss">Bowed strings only</span>
+    </div>
+
+    <p class="lede">
+      Cello, violin, viola, double bass and string orchestra. Nothing here is
+      recorded and nothing is a sampled instrument: each string is simulated
+      from its physics as you press it &#x2014; a wave running to the bridge and
+      back, with the bow gripping and slipping hundreds of times a second.
+      Press a title and it sings.
+    </p>
+
+    <div class="scope-frame">
+      <span class="scope-tag" id="scopeTag">Silent</span>
+      <canvas id="scope" width="1400" height="192" aria-hidden="true"></canvas>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filter by instrument">
+    <button class="chip" data-filter="all" aria-pressed="true">All</button>
+    <button class="chip" data-filter="cello"  data-inst="cello"><span class="swatch"></span>Cello</button>
+    <button class="chip" data-filter="violin" data-inst="violin"><span class="swatch"></span>Violin</button>
+    <button class="chip" data-filter="viola"  data-inst="viola"><span class="swatch"></span>Viola</button>
+    <button class="chip" data-filter="bass"   data-inst="bass"><span class="swatch"></span>Bass</button>
+    <button class="chip" data-filter="ens"    data-inst="ens"><span class="swatch"></span>Orchestra</button>
+  </div>
+
+  <main id="library"></main>
+
+  <footer>
+    <p>
+      Each string is a digital waveguide: a delay loop carrying the wave to the
+      bridge and back, a stick-slip friction curve where the hair meets it, and
+      a damping filter deciding how fast the harmonics die. Nothing about the
+      tone is drawn by hand &#x2014; the harmonics emerge from the loop and shift as
+      the string moves, which is exactly what stacked oscillators cannot do and
+      why they always sound like a synthesizer. Bow position, string damping
+      and the body resonances of the box differ per instrument. Four-note
+      chords roll, because no bow crosses four strings at once.
+    </p>
+    <p>
+      Above the physics sits the playing. Each line is split into phrases and
+      shaped &#x2014; a swell toward the peak, weight on the higher notes, a taper at
+      the close. Bowing harder is brighter as well as louder, but that is not a
+      filter trick: more bow really does put more energy into the upper
+      harmonics. Vibrato shortens the string the way a finger does. Slurred
+      notes carry the pitch between them. Endings broaden. Scales are exempt
+      from all of it, because a scale is a measurement.
+    </p>
+    <p>
+      The repertoire is public domain. Themes are transcribed and arranged for
+      one to three synthesized voices, not reproduced from an edition &#x2014; scales
+      and the Pachelbel ground are exact; the concerto and aria themes are
+      readings. The Elgar is a concert arrangement of all four movements rather
+      than the complete score, which runs near half an hour, and it is played
+      in du Pr&#xe9;&rsquo;s manner rather than neutrally: her enormous dynamic range,
+      her wide and immediate vibrato, her audible slides, and above all her
+      rubato, which stretches and drives the pulse the whole way through
+      instead of merely easing the last bars. No performer&rsquo;s recording
+      appears here &#x2014; not hers and not anyone&rsquo;s. The ten players are named
+      for the piece each is bound to, played in this app&rsquo;s own voice.
+    </p>
+  </footer>
+</div>
+
+<div class="player">
+  <div class="player-inner">
+    <div class="progress"><div id="bar"></div></div>
+    <div class="player-main">
+      <div class="now">
+        <span class="who" id="nowWho">Arco</span>
+        <span class="what" id="nowWhat">Press any title to play</span>
+      </div>
+      <div class="readout idle" id="readout" aria-live="off">&#x2014;</div>
+      <button class="stop" id="stop" disabled aria-label="Stop">
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
+          <rect width="12" height="12" rx="1.5" fill="currentColor"></rect>
+        </svg>
+      </button>
+    </div>
+    <div class="dials">
+      <div class="dial">
+        <label for="tempo">Tempo</label>
+        <input type="range" id="tempo" min="50" max="140" value="100" step="1">
+        <output id="tempoOut">100%</output>
+      </div>
+      <div class="dial">
+        <label for="vol">Volume</label>
+        <input type="range" id="vol" min="0" max="100" value="78" step="1">
+        <output id="volOut">78</output>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sr" id="announce" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================================================================== pitch */
+
+  var STEP = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  var SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  var FLAT_NAMES  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+  function midiOf(name) {
+    var m = /^([A-G])([#b]?)(-?\d+)$/.exec(name);
+    if (!m) return null;
+    var semi = STEP[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0);
+    return (parseInt(m[3], 10) + 1) * 12 + semi;
+  }
+
+  function freqOf(name) {
+    var n = midiOf(name);
+    return n === null ? 0 : 440 * Math.pow(2, (n - 69) / 12);
+  }
+
+  function nameOf(midi, useFlats) {
+    var pc = ((midi % 12) + 12) % 12;
+    var oct = Math.floor(midi / 12) - 1;
+    return (useFlats ? FLAT_NAMES : SHARP_NAMES)[pc] + oct;
+  }
+
+  /* ==================================================================== DSL */
+
+  /* "D5/1 G4/.5 r/1 E2+B2+E3+G3/2" \u2014 pitch(es)/duration in beats, r = rest.
+     Chord members are offset slightly so they roll like a real bowed chord. */
+  function parseSeq(seq) {
+    var notes = [], t = 0;
+    var toks = seq.trim().split(/\s+/);
+    for (var i = 0; i < toks.length; i++) {
+      var tok = toks[i];
+      if (!tok) continue;
+      var slash = tok.lastIndexOf("/");
+      var pitches = tok.slice(0, slash);
+      var dur = parseFloat(tok.slice(slash + 1));
+      if (!isFinite(dur) || dur <= 0) continue;
+      if (pitches !== "r") {
+        var ps = pitches.split("+");
+        for (var j = 0; j < ps.length; j++) {
+          var midi = midiOf(ps[j]);
+          if (midi === null) continue;
+          notes.push({
+            midi: midi,
+            freq: freqOf(ps[j]),
+            beat: t,
+            dur: dur,
+            roll: ps.length > 1 ? j * 0.06 : 0,
+            top: j === ps.length - 1
+          });
+        }
+      }
+      t += dur;
+    }
+    return { notes: notes, beats: t };
+  }
+
+  /* ============================================================ expression */
+
+  /* How a passage is played, which matters more to whether it sings than any
+     amount of filter tuning. Cantabile connects and leans; baroque speaks
+     each note; practice stays metronomic because a scale is a measurement. */
+  var STYLE = {
+    /* The playing of the 1965 Elgar: a huge dynamic range, vibrato that is
+       wide and fast and arrives almost at once, slides between notes that
+       nobody hides, and a pulse that is stretched and driven throughout
+       rather than kept. Romantic cello playing of that generation is not
+       cantabile with the dial turned up - the rubato is the substance of it. */
+    dupre:     { legato: 0.11, porta: 0.115, portaMax: 9, arc: 0.44, vib: 1.85,
+                 atkMul: 1.55, wet: 1.25, rit: 0.80, ritTail: 10, human: 1.6,
+                 rub: 1.0 },
+    cantabile: { legato: 0.075, porta: 0.06, portaMax: 5, arc: 0.30, vib: 1.30,
+                 atkMul: 1.35, wet: 1.15, rit: 0.55, ritTail: 6, human: 1.0,
+                 rub: 0.45 },
+    baroque:   { legato: 0.015, porta: 0.03, portaMax: 3, arc: 0.20, vib: 0.95,
+                 atkMul: 1.00, wet: 0.95, rit: 0.30, ritTail: 4, human: 0.55,
+                 rub: 0.18 },
+    practice:  { legato: -0.02, porta: 0,    portaMax: 0, arc: 0.06, vib: 0.75,
+                 atkMul: 0.85, wet: 0.80, rit: 0,    ritTail: 0, human: 0,
+                 rub: 0 }
+  };
+
+  /* Group simultaneous notes, break the line into phrases at rests and long
+     notes, then shape each phrase: a swell toward its middle, extra weight on
+     the higher notes, and a taper at the end. This is what stops a sequence
+     of correct pitches from sounding like a sequence of correct pitches. */
+  function shape(parsed, style) {
+    var groups = [], byBeat = {}, i;
+
+    for (i = 0; i < parsed.notes.length; i++) {
+      var n = parsed.notes[i];
+      var k = n.beat.toFixed(4);
+      if (!byBeat[k]) {
+        byBeat[k] = { beat: n.beat, dur: n.dur, notes: [] };
+        groups.push(byBeat[k]);
+      }
+      byBeat[k].notes.push(n);
+      if (n.dur > byBeat[k].dur) byBeat[k].dur = n.dur;
+    }
+    groups.sort(function (a, b) { return a.beat - b.beat; });
+
+    var phrases = [], cur = [];
+    for (i = 0; i < groups.length; i++) {
+      cur.push(groups[i]);
+      var g = groups[i], next = groups[i + 1];
+      var gap = next ? next.beat - (g.beat + g.dur) : 99;
+      if (!next || gap > 0.12 || g.dur >= 3) { phrases.push(cur); cur = []; }
+    }
+
+    for (i = 0; i < phrases.length; i++) {
+      var ph = phrases[i];
+      var tops = ph.map(function (gr) {
+        return gr.notes.reduce(function (m, x) { return Math.max(m, x.midi); }, 0);
+      });
+      var lo = Math.min.apply(null, tops), hi = Math.max.apply(null, tops);
+      var span = Math.max(1, hi - lo);
+
+      /* eslint-disable no-loop-func */
+      ph.forEach(function (gr, j) {
+        var pos = ph.length === 1 ? 0.5 : j / (ph.length - 1);
+        var swell = Math.sin(Math.PI * pos);
+        var lift = (tops[j] - lo) / span;
+        var v = 1 - style.arc + style.arc * (0.55 * swell + 0.45 * lift);
+        /* Taper the last note, in proportion to how expressive this style is \u2014
+           a practised scale should end as evenly as it began. */
+        if (j === ph.length - 1 && ph.length > 2) v *= 1 - style.arc * 0.4;
+        for (var q = 0; q < gr.notes.length; q++) gr.notes[q].vel = v;
+      });
+      /* eslint-enable no-loop-func */
+    }
+
+    /* Portamento reference: only between two single notes that actually touch,
+       so chords and detached passages never slide. */
+    for (i = 1; i < groups.length; i++) {
+      var prev = groups[i - 1], now = groups[i];
+      if (prev.notes.length === 1 && now.notes.length === 1 &&
+          now.beat - (prev.beat + prev.dur) <= 0.02) {
+        now.notes[0].from = prev.notes[0].midi;
+      }
+    }
+    parsed.phrases = phrases.map(function (ph) {
+      var last = ph[ph.length - 1];
+      return [ph[0].beat, last.beat + last.dur];
+    });
+    return parsed;
+  }
+
+  /* A broadening over the closing beats \u2014 the single clearest signal that a
+     phrase is ending rather than merely stopping. Returns warped beats. */
+  /* Rubato. A player does not hold a metronome and then slow down at the very
+     end; the pulse breathes all the way through - settling into each phrase,
+     pressing forward through its middle, opening out again as it closes. This
+     builds a local tempo curve over the whole piece and integrates it into a
+     beat-to-time map, so every voice bends together and nothing drifts apart. */
+  function timeMap(phrases, spanBeats, style) {
+    var rub = style.rub || 0;
+    var step = 0.25;
+    var n = Math.ceil(spanBeats / step) + 2;
+    var sc = new Float64Array(n);
+    var i, k;
+    for (i = 0; i < n; i++) sc[i] = 1;
+
+    if (rub > 0 && phrases) {
+      for (k = 0; k < phrases.length; k++) {
+        var a = phrases[k][0], b = phrases[k][1], len = b - a;
+        if (len < 1.5) continue;
+        var i0 = Math.floor(a / step), i1 = Math.ceil(b / step);
+        for (i = i0; i < i1 && i < n; i++) {
+          var pos = (i * step - a) / len;
+          if (pos < 0) pos = 0; else if (pos > 1) pos = 1;
+          /* Slower at both ends of the phrase, quicker through its middle. */
+          sc[i] *= 1 + rub * 0.15 * Math.cos(6.2831853 * pos);
+        }
+      }
+    }
+
+    if (style.rit > 0 && style.ritTail > 0) {
+      var tail = Math.min(style.ritTail, spanBeats);
+      var start = spanBeats - tail;
+      for (i = 0; i < n; i++) {
+        var bt = i * step;
+        if (bt > start) sc[i] *= 1 + style.rit * Math.min(bt - start, tail) / tail;
+      }
+    }
+
+    var t = new Float64Array(n + 1);
+    for (i = 0; i < n; i++) t[i + 1] = t[i] + step * sc[i];
+
+    return function (beat) {
+      if (beat <= 0) return 0;
+      var x = beat / step, j = Math.floor(x);
+      if (j >= n) return t[n] + (beat - n * step) * sc[n - 1];
+      return t[j] + (t[j + 1] - t[j]) * (x - j);
+    };
+  }
+
+  /* ============================================================ instruments */
+
+  /* body: [frequency, gain dB, Q] \u2014 the air and plate resonances that make a
+     sawtooth read as a wooden box rather than a synth lead. */
+  /* Physical parameters, not oscillator settings. bowPos is where the hair
+     meets the string as a fraction of its length; damp is how much energy
+     survives each round trip to the bridge, which sets both sustain and how
+     many harmonics live; body lists the air and plate resonances of the box
+     the string is stretched over \u2014 the cello's ~105 Hz air mode is why it
+     sounds like a chest rather than a wire. */
+  var INST = {
+    cello: {
+      label: "Cello", tint: "#DE9639",
+      bowPos: 0.140, bowVel: 0.18, bowSlope: 3.0, bowOff: 0.001, bowNoise: 0.006,
+      bowAtk: 0.055, bowRel: 0.10, pole: 0.70, damp: 0.968, tail: 0.55,
+      vibRate: 5.1, vibDepth: 24, level: 0.42,
+      direct: 0.10,
+      body: { low: 95, top: 4200, spacing: 26, hill: [1450, 0.90, 1.40],
+              modes: [[103,1.0,23],[168,0.70,36],[198,1.0,32],[255,0.50,43],
+                      [308,0.65,22],[392,0.50,47],[470,0.45,43]] }
+    },
+    violin: {
+      label: "Violin", tint: "#EFD98C",
+      bowPos: 0.110, bowVel: 0.14, bowSlope: 3.0, bowOff: 0.001, bowNoise: 0.007,
+      bowAtk: 0.040, bowRel: 0.08, pole: 0.36, damp: 0.960, tail: 0.42,
+      vibRate: 6.0, vibDepth: 26, level: 0.29,
+      direct: 0.12,
+      body: { low: 225, top: 7000, spacing: 38, hill: [2500, 0.85, 1.48],
+              modes: [[280,1.0,25],[400,0.50,40],[460,0.80,32],[530,1.0,31],
+                      [620,0.50,24],[750,0.45,47],[900,0.40,43]] }
+    },
+    viola: {
+      label: "Viola", tint: "#D6B45A",
+      bowPos: 0.120, bowVel: 0.16, bowSlope: 3.0, bowOff: 0.001, bowNoise: 0.0065,
+      bowAtk: 0.048, bowRel: 0.09, pole: 0.30, damp: 0.964, tail: 0.48,
+      vibRate: 5.5, vibDepth: 24, level: 0.18,
+      direct: 0.11,
+      body: { low: 200, top: 5400, spacing: 30, hill: [1900, 0.90, 1.44],
+              modes: [[222,1.0,25],[320,0.55,40],[365,0.80,32],[425,1.0,31],
+                      [520,0.50,24],[640,0.45,47]] }
+    },
+    bass: {
+      label: "Double bass", tint: "#B4762F",
+      bowPos: 0.100, bowVel: 0.13, bowSlope: 2.8, bowOff: 0.001, bowNoise: 0.005,
+      bowAtk: 0.075, bowRel: 0.13, pole: 0.86, damp: 0.974, tail: 0.70,
+      vibRate: 4.5, vibDepth: 18, level: 0.5,
+      direct: 0.08,
+      body: { low: 52, top: 2200, spacing: 16, hill: [800, 1.00, 1.40],
+              modes: [[60,1.0,22],[95,0.75,32],[112,0.90,29],[150,0.55,40],
+                      [190,0.60,20],[245,0.45,43]] }
+    },
+    /* Section voices: a slower, softer collective onset and shallower
+       vibrato, because a desk of players never lines up exactly. */
+    strings: {
+      label: "Strings", tint: "#8FA8B4",
+      bowPos: 0.110, bowVel: 0.13, bowSlope: 3.2, bowOff: 0.001, bowNoise: 0.005,
+      bowAtk: 0.085, bowRel: 0.12, pole: 0.30, damp: 0.958, tail: 0.50,
+      vibRate: 5.4, vibDepth: 15, level: 0.58,
+      direct: 0.10,
+      body: { low: 240, top: 6200, spacing: 34, hill: [2200, 0.95, 1.32],
+              modes: [[275,1.0,22],[400,0.55,36],[470,0.80,29],[540,0.90,29],
+                      [640,0.50,22]] }
+    },
+    lowstrings: {
+      label: "Low strings", tint: "#8FA8B4",
+      bowPos: 0.130, bowVel: 0.16, bowSlope: 3.0, bowOff: 0.001, bowNoise: 0.0045,
+      bowAtk: 0.080, bowRel: 0.12, pole: 0.70, damp: 0.966, tail: 0.60,
+      vibRate: 4.8, vibDepth: 13, level: 0.68,
+      direct: 0.09,
+      body: { low: 85, top: 3400, spacing: 22, hill: [1100, 1.00, 1.36],
+              modes: [[98,1.0,22],[160,0.70,32],[195,0.90,29],[250,0.50,40],
+                      [310,0.55,20]] }
+    },
+    /* Plucked: the same string, struck and left alone. */
+    pizz: {
+      label: "Pizzicato", tint: "#8FA8B4", pluck: true,
+      damp: 0.9962, tail: 1.1, level: 0.38,
+      bowPos: 0.12, bowVel: 0, bowSlope: 3, bowOff: 0.001, bowNoise: 0,
+      bowAtk: 0.004, bowRel: 0.05, pole: 0.5, vibRate: 0, vibDepth: 0,
+      direct: 0.18,
+      body: { low: 95, top: 4600, spacing: 26, hill: [1500, 0.90, 1.36],
+              modes: [[103,1.0,23],[168,0.70,36],[198,1.0,32],[255,0.50,43],
+                      [308,0.65,22],[392,0.50,47]] }
+    }
+  };
+
+  var TINTS = {
+    cello: "#DE9639", violin: "#EFD98C", viola: "#D6B45A",
+    bass: "#B4762F", ens: "#8FA8B4"
+  };
+
+  /* ============================================================ scale maker */
+
+  var MAJOR = [0, 2, 4, 5, 7, 9, 11, 12];
+
+  /* Practical two-octave starting notes, chosen to sit where the key actually
+     lies on each instrument rather than wherever the tonic first appears. */
+  var SCALE_HOME = {
+    cello:  { C: "C2", G: "G2", D: "D2", A: "A2", E: "E2", F: "F2", Bb: "Bb2", Eb: "Eb2" },
+    violin: { C: "C4", G: "G3", D: "D4", A: "A3", E: "E4", F: "F4", Bb: "Bb3", Eb: "Eb4" },
+    viola:  { C: "C3", G: "G3", D: "D3", A: "A3", E: "E3", F: "F3", Bb: "Bb3", Eb: "Eb3" },
+    bass:   { C: "C2", G: "G1", D: "D2", A: "A1", E: "E1", F: "F1", Bb: "Bb1", Eb: "Eb1" }
+  };
+
+  var FLAT_KEYS = { F: 1, Bb: 1, Eb: 1 };
+
+  function buildScale(inst, key) {
+    var home = SCALE_HOME[inst][key];
+    var root = midiOf(home);
+    var flats = !!FLAT_KEYS[key];
+    var up = [], i, m;
+
+    for (i = 0; i < MAJOR.length; i++) up.push(root + MAJOR[i]);
+    for (i = 1; i < MAJOR.length; i++) up.push(root + 12 + MAJOR[i]);
+
+    var seq = [];
+    for (i = 0; i < up.length; i++) seq.push(up[i]);
+    for (i = up.length - 2; i >= 0; i--) seq.push(up[i]);
+
+    var out = [];
+    for (i = 0; i < seq.length; i++) {
+      m = seq[i];
+      /* Top and bottom of the scale get a full beat \u2014 that is how it is
+         practised, turning the corner rather than running through it. */
+      var last = i === seq.length - 1;
+      var turn = i === up.length - 1;
+      out.push(nameOf(m, flats) + "/" + (last ? 2 : turn ? 1 : 0.5));
+    }
+    return {
+      seq: out.join(" "),
+      low: nameOf(root, flats),
+      high: nameOf(root + 24, flats)
+    };
+  }
+
+  /* ================================================================ players */
+
+  /* Ten who set the standard, each attached to the piece they are bound to.
+     These are not their recordings \u2014 nobody's recording is in this app. It is
+     the app's own voice playing what made each of them unforgettable. */
+  var PLAYERS = [
+    { name: "Pablo Casals", life: "1876\u20131973", inst: "cello",
+      why: "Found the six suites in a Barcelona shop at thirteen, then waited twelve years before playing one in public.",
+      piece: "Prelude, Cello Suite No. 1 in G, BWV 1007" },
+    { name: "Jacqueline du Pr\u00e9", life: "1945\u20131987", inst: "cello",
+      why: "Recorded the Elgar at twenty; it has belonged to her ever since. This one is played her way - vibrato wide and immediate, slides nobody hides, and a pulse pulled about freely.",
+      piece: "Cello Concerto in E minor, Op. 85" },
+    { name: "Mstislav Rostropovich", life: "1927\u20132007", inst: "cello",
+      why: "Had well over a hundred works written for him, and made the Dvo\u0159\u00e1k the summit of the repertoire.",
+      piece: "Cello Concerto in B minor, Op. 104 \u2014 theme" },
+    { name: "Yo-Yo Ma", life: "born 1955", inst: "cello",
+      why: "A singing tone so unforced it carried the cello out of the concert hall entirely.",
+      piece: "The Swan, from Carnival of the Animals" },
+    { name: "Pierre Fournier", life: "1906\u20131986", inst: "cello",
+      why: "Called the aristocrat of cellists, for a line that never strains and never sags.",
+      piece: "\u00c9l\u00e9gie, Op. 24" },
+    { name: "Jascha Heifetz", life: "1901\u20131987", inst: "violin",
+      why: "Recorded both solo parts of the Bach Double himself, playing against his own tape.",
+      piece: "Double Violin Concerto, BWV 1043 \u2014 Largo" },
+    { name: "David Oistrakh", life: "1908\u20131974", inst: "violin",
+      why: "A tone the size of a room, produced with no visible effort at all.",
+      piece: "Winter, Op. 8 No. 4 \u2014 Largo" },
+    { name: "Yehudi Menuhin", life: "1916\u20131999", inst: "violin",
+      why: "A prodigy at eleven who spent the rest of a long life circling back to Bach.",
+      piece: "Air on the G String, BWV 1068" },
+    { name: "Itzhak Perlman", life: "born 1945", inst: "violin",
+      why: "The M\u00e9ditation is his calling card, and has been for fifty years.",
+      piece: "M\u00e9ditation from Tha\u00efs" },
+    { name: "Anne-Sophie Mutter", life: "born 1963", inst: "violin",
+      why: "Karajan put her on record at fifteen; her Seasons remain the ones to argue with.",
+      piece: "Spring, Op. 8 No. 1 \u2014 ritornello" }
+  ];
+
+  /* ============================================================= repertoire */
+
+  var LIBRARY = [
+    {
+      title: "Concertos",
+      note: "Soloist and strings",
+      tracks: [
+        {
+          composer: "Edward Elgar",
+          title: "Cello Concerto in E minor, Op. 85",
+          inst: "cello", key: "E minor", bpm: 86, style: "dupre",
+          /* All four movements in sequence. The concerto proper runs close to
+             half an hour; this is a concert arrangement of its span - the
+             recitative, the 9/8 theme the violas give out before the soloist
+             takes it, the scurrying G major scherzo, the B-flat Adagio, the
+             finale, and the return of the slow movement and the recitative
+             that Elgar brings back before the last bars.
+
+             Everything is written against one pulse, with note values doing
+             the work of tempo marks, so the scherzo runs in semiquavers where
+             the Adagio moves in whole beats. bar() takes all three voices at
+             once, which is what keeps the soloist and the orchestra in step. */
+          parts: (function () {
+            var C = [], U = [], L = [];
+            function bar(c, u, l) { C.push(c); U.push(u); L.push(l); }
+
+            /* --- I. Adagio: the recitative, solo and unaccompanied ------- */
+            bar("E2+B2+E3+G3/3 r/0.5", "r/3.5", "r/3.5");
+            bar("B3/1 A3/0.5 G3/0.5 F#3/1 E3/2 r/0.5", "r/5.5", "r/5.5");
+            bar("D2+A2+D3+F3/3 r/0.5", "r/3.5", "r/3.5");
+            bar("C4/1 B3/0.5 A3/0.5 G3/1 F#3/2 r/0.5", "r/5.5", "r/5.5");
+            bar("E2+B2+E3+G3/4 r/2", "r/6", "r/6");
+
+            /* --- I. Moderato: the 9/8 theme, violas first --------------- */
+            var theme =
+              "E4/1.5 F#4/0.5 G4/0.5 F#4/0.5 E4/1.5 " +
+              "B3/1.5 E4/1.5 D4/0.5 C4/0.5 B3/0.5 " +
+              "C4/1.5 B3/0.5 A3/0.5 G3/0.5 F#3/1.5 " +
+              "E3/3 B3/1.5";
+            var themeHi =
+              "E5/1.5 F#5/0.5 G5/0.5 F#5/0.5 E5/1.5 " +
+              "B4/1.5 E5/1.5 D5/0.5 C5/0.5 B4/0.5 " +
+              "C5/1.5 B4/0.5 A4/0.5 G4/0.5 F#4/1.5 " +
+              "E4/3 B3/1.5";
+            var emBass = "E2/4.5 B2/4.5 C3/4.5 E2/4.5";
+            var emChord = "E3+G3/4.5 D3+B3/4.5 C3+G3/4.5 B2+E3/4.5";
+
+            bar("r/18", theme, emBass);
+            bar(theme, emChord, emBass);
+
+            /* the theme opens out */
+            bar("E4/1.5 F#4/0.5 G4/0.5 A4/0.5 B4/1.5 " +
+                "A4/1.5 G4/1.5 F#4/0.5 E4/0.5 D4/0.5 " +
+                "C4/1.5 B3/1.5 A3/1.5 " +
+                "E3/4.5",
+                "A2+C3/4.5 G2+B2/4.5 F#2+A2/4.5 E3+B3/4.5",
+                "A2/4.5 G2/4.5 F#2/4.5 E2/4.5");
+
+            bar(themeHi, emChord, emBass);
+
+            bar("C5/1.5 B4/0.5 A4/0.5 G4/0.5 F#4/1.5 " +
+                "G4/1.5 A4/1.5 B4/1.5 " +
+                "A4/1.5 G4/1.5 F#4/1.5 " +
+                "E4/4.5",
+                "A2+C3/4.5 G2+B2/4.5 D3+F#3/4.5 E3+G3/4.5",
+                "A2/4.5 G2/4.5 D2/4.5 E2/4.5");
+
+            /* --- II. Allegro molto: the scherzo, in semiquavers ---------- */
+            /* Built from arpeggio figures the way the movement itself is -
+                perpetual motion over a moving harmony. */
+            function run(fig) {
+              return fig.split(" ").map(function (n) { return n + "/0.25"; }).join(" ");
+            }
+            var scherzo = [
+              ["G3 B3 D4 B3 G3 D4 B3 G3", "G2/2", "G2/2"],
+              ["C3 E3 G3 E3 C4 G3 E3 C3", "C3/2", "C2/2"],
+              ["D3 F#3 A3 F#3 D4 A3 F#3 D3", "D3/2", "D2/2"],
+              ["G3 B3 D4 B3 G3 D4 B3 G3", "G2/2", "G2/2"],
+              ["E3 G3 B3 G3 E4 B3 G3 E3", "E3/2", "E2/2"],
+              ["A3 C4 E4 C4 A3 E4 C4 A3", "A2/2", "A2/2"],
+              ["D3 F#3 A3 D4 C4 A3 F#3 D3", "D3/2", "D2/2"],
+              ["G3 D4 B3 G3 D3 G3 B3 D4", "G2/2", "G2/2"],
+              ["B3 D4 F#4 D4 B3 F#4 D4 B3", "B2/2", "B2/2"],
+              ["E3 G3 B3 G3 E4 B3 G3 E3", "E3/2", "E2/2"],
+              ["A3 C4 E4 C4 A3 E4 C4 A3", "A2/2", "A2/2"],
+              ["D3 F#3 A3 F#3 D4 A3 F#3 D3", "D3/2", "D2/2"],
+              ["G3 B3 D4 B3 G3 D4 B3 G3", "G2/2", "G2/2"],
+              ["C4 E4 G4 E4 C4 G3 E3 C3", "C3/2", "C2/2"],
+              ["D4 C4 B3 A3 G3 F#3 E3 D3", "D3/2", "D2/2"],
+              ["G3 B3 D4 G4 B3 G3 D3 G2", "G2/2", "G2/2"]
+            ];
+            for (var s = 0; s < scherzo.length; s++) {
+              bar(run(scherzo[s][0]), "r/2", scherzo[s][2]);
+            }
+
+            /* --- III. Adagio in B-flat ---------------------------------- */
+            bar("Bb3/2 Eb4/1 D4/1", "Bb2+D3+F3/4", "Bb1/4");
+            bar("C4/2 Bb3/2",       "Eb3+G3/2 Bb2+D3/2", "Eb2/2 Bb1/2");
+            bar("F4/2 Eb4/1 D4/1",  "Bb2+D3+F3/4", "Bb1/4");
+            bar("C4/4",             "C3+Eb3+G3/2 F2+C3+Eb3/2", "C2/2 F2/2");
+            bar("D4/2 G4/1 F4/1",   "Bb2+D3+G3/4", "G1/4");
+            bar("Eb4/2 D4/2",       "Eb3+G3/2 Bb2+D3/2", "Eb2/2 Bb1/2");
+            bar("C4/1 D4/1 Eb4/1 F4/1", "C3+Eb3/2 F2+C3/2", "C2/2 F2/2");
+            bar("Bb3/4",            "Bb2+D3+F3/4", "Bb1/4");
+
+            bar("F4/2 Bb4/1 Ab4/1", "F3+Bb3/4", "Bb1/4");
+            bar("G4/2 F4/2",        "Eb3+G3/2 C3+F3/2", "Eb2/2 F2/2");
+            bar("Eb4/2 F4/1 G4/1",  "Bb2+Eb3/4", "Eb2/4");
+            bar("F4/4",             "C3+F3/2 Bb2+F3/2", "F2/2 F2/2");
+            bar("G4/2 C5/1 Bb4/1",  "Eb3+G3/4", "C2/4");
+            bar("Ab4/2 G4/2",       "Ab2+C3/2 Eb3+G3/2", "Ab1/2 Eb2/2");
+            bar("F4/1 Eb4/1 D4/1 C4/1", "Bb2+D3/2 F2+C3/2", "Bb1/2 F2/2");
+            bar("Bb3/4",            "Bb2+D3+F3/4", "Bb1/4");
+
+            /* --- IV. Allegro: the finale ------------------------------- */
+            var fin =
+              "E3/1 B3/0.5 E4/0.5 G4/1 F#4/1 " +
+              "E4/1 D4/0.5 C4/0.5 B3/1 E3/1";
+            bar(fin, "E3+G3/2 B2+E3/2 E3+G3/2 B2+E3/2", "E2/2 B2/2 E2/2 E2/2");
+            bar("A3/1 E4/0.5 A4/0.5 C5/1 B4/1 " +
+                "A4/1 G4/0.5 F#4/0.5 E4/1 A3/1",
+                "A2+C3/2 E3+A3/2 A2+C3/2 E3+A3/2", "A2/2 E2/2 A2/2 A2/2");
+            bar("B3/1 F#4/0.5 B4/0.5 D5/1 C5/1 " +
+                "B4/1 A4/0.5 G4/0.5 F#4/1 B3/1",
+                "B2+D3/2 F#3+B3/2 B2+D3/2 F#3+B3/2", "B2/2 F#2/2 B2/2 B2/2");
+            bar("E4/1 G4/0.5 B4/0.5 E5/1 D5/1 " +
+                "C5/1 B4/0.5 A4/0.5 G4/1 F#4/1",
+                "E3+G3/2 B2+E3/2 C3+G3/2 B2+D3/2", "E2/2 B2/2 C3/2 B2/2");
+            bar("E4/2 B3/2 E3/4", "E3+G3/4 B2+E3/4", "E2/4 E2/4");
+
+            /* --- The Adagio returns, then the recitative, then the end --- */
+            bar("B3/2 E4/1 D4/1", "E3+G3/4", "E2/4");
+            bar("C4/2 B3/2",      "A2+C3/2 B2+D3/2", "A2/2 B2/2");
+            bar("A3/2 G3/1 F#3/1", "F#2+A2/4", "F#2/4");
+            bar("E3/4",           "E2+B2+E3/4", "E2/4");
+
+            bar("E2+B2+E3+G3/3 r/0.5", "r/3.5", "r/3.5");
+            bar("B3/1 A3/0.5 G3/0.5 F#3/1 E3/2 r/0.5", "r/5.5", "r/5.5");
+            bar("E3/1 F#3/1 G3/1 A3/1", "E3+G3/2 C3+E3/2", "E2/2 C3/2");
+            bar("B3/2 E4/2", "B2+D#3/2 E3+G3/2", "B2/2 E2/2");
+            bar("E2+B2+E3+G3/6", "E3+G3+B3/6", "E2/6");
+
+            return [
+              { inst: "cello", gain: 1, seq: C.join(" ") },
+              { inst: "strings", gain: 0.46, seq: U.join(" ") },
+              { inst: "lowstrings", gain: 0.58, seq: L.join(" ") }
+            ];
+          })()
+        },
+        {
+          composer: "Antonio Vivaldi",
+          title: "Spring, Op. 8 No. 1 \u2014 ritornello",
+          inst: "violin", key: "E major", bpm: 108,
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "E5/0.5 E5/0.5 E5/1 E5/0.5 E5/0.5 E5/1 " +
+                   "E5/0.5 G#5/0.5 B5/1 B5/0.5 A5/0.5 G#5/1 " +
+                   "G#5/0.5 F#5/0.5 E5/1 F#5/0.5 G#5/0.5 A5/1 " +
+                   "B5/2 A5/1 G#5/1 F#5/2 E5/2 " +
+                   /* the birds answer, high and trilling, before the
+                      ritornello comes back */
+                   "B5/0.25 A5/0.25 B5/0.25 A5/0.25 B5/0.5 r/0.5 " +
+                   "G#5/0.25 F#5/0.25 G#5/0.25 F#5/0.25 G#5/0.5 r/0.5 " +
+                   "E6/0.25 D#6/0.25 E6/0.25 D#6/0.25 E6/0.5 B5/0.5 " +
+                   "C#6/0.25 B5/0.25 C#6/0.25 B5/0.25 A5/0.5 G#5/0.5 " +
+                   "F#5/0.25 E5/0.25 F#5/0.25 G#5/0.25 A5/0.5 F#5/0.5 " +
+                   "E5/1 B5/1 " +
+                   "E5/0.5 E5/0.5 E5/1 E5/0.5 E5/0.5 E5/1 " +
+                   "E5/0.5 G#5/0.5 B5/1 B5/0.5 A5/0.5 G#5/1 " +
+                   "G#5/0.5 F#5/0.5 E5/1 D#5/0.5 E5/0.5 F#5/1 " +
+                   "E5/4"
+            },
+            {
+              inst: "lowstrings", gain: 0.62,
+              seq: "E2/2 E2/2 E2/2 B2/2 " +
+                   "C#3/2 B2/2 B2/2 E2/2 " +
+                   "E2/2 B2/2 " +
+                   /* the band thins out under the birdsong */
+                   "E2/4 B2/4 E2/4 " +
+                   "E2/2 E2/2 E2/2 B2/2 " +
+                   "C#3/2 B2/2 B2/2 E2/2"
+            }
+          ]
+        },
+        {
+          composer: "Anton\u00edn Dvo\u0159\u00e1k",
+          title: "Cello Concerto in B minor, Op. 104 \u2014 theme",
+          inst: "cello", key: "D major", bpm: 54, style: "dupre",
+          parts: [
+            {
+              inst: "cello", gain: 1,
+              seq: "A3/1.5 D4/0.5 F#4/1 E4/1 " +
+                   "D4/2 A3/2 " +
+                   "B3/1 D4/1 A4/1.5 G4/0.5 " +
+                   "F#4/3 E4/1 " +
+                   "D4/1 E4/0.5 F#4/0.5 G4/1 F#4/1 " +
+                   "E4/2 A3/2 " +
+                   "D4/1 C#4/1 B3/1 A3/1 " +
+                   "D4/4"
+            },
+            {
+              inst: "lowstrings", gain: 0.6,
+              seq: "D2/2 A2/2 D2/2 D2/2 " +
+                   "G2/2 A2/2 D2/2 A2/2 " +
+                   "D2/2 B2/2 A2/2 A2/2 " +
+                   "D2/2 A2/2 D2/4"
+            }
+          ]
+        },
+        {
+          composer: "J. S. Bach",
+          title: "Double Violin Concerto, BWV 1043 \u2014 Largo",
+          inst: "violin", key: "F major", bpm: 66, style: "cantabile",
+          /* Two equal violins, the second following half a bar behind, which
+             is the whole substance of the movement. */
+          parts: (function () {
+            var line =
+              "F4/1.5 G4/0.5 A4/0.5 Bb4/0.5 C5/1.5 A4/1.5 " +
+              "Bb4/1.5 A4/0.5 G4/0.5 F4/0.5 G4/1.5 E4/1.5 " +
+              "F4/1.5 A4/0.5 C5/0.5 D5/0.5 C5/1.5 A4/1.5 " +
+              "Bb4/3 G4/3 " +
+              "A4/1.5 Bb4/0.5 C5/0.5 D5/0.5 E5/1.5 C5/1.5 " +
+              "D5/1.5 C5/0.5 Bb4/0.5 A4/0.5 Bb4/1.5 G4/1.5 " +
+              "A4/1.5 F4/0.5 G4/0.5 A4/0.5 Bb4/1.5 A4/1.5 " +
+              "F4/6 ";
+            var bass =
+              "F2/1.5 C3/1.5 F2/1.5 A2/1.5 " +
+              "Bb2/1.5 F2/1.5 C3/1.5 C3/1.5 " +
+              "F2/1.5 A2/1.5 D3/1.5 C3/1.5 " +
+              "Bb2/3 G2/3 " +
+              "A2/1.5 F2/1.5 C3/1.5 A2/1.5 " +
+              "Bb2/1.5 G2/1.5 C3/1.5 C3/1.5 " +
+              "F2/1.5 D3/1.5 G2/1.5 C3/1.5 " +
+              "F2/6 F2/3";
+            return [
+              { inst: "violin", gain: 1, seq: line + "A4/3" },
+              { inst: "violin", gain: 0.85, seq: "r/3 " + line },
+              { inst: "lowstrings", gain: 0.6, seq: bass }
+            ];
+          })()
+        },
+        {
+          composer: "Georg Philipp Telemann",
+          title: "Viola Concerto in G, TWV 51:G9 \u2014 Largo",
+          inst: "viola", key: "G major", bpm: 56, style: "cantabile",
+          parts: [
+            {
+              inst: "viola", gain: 1,
+              seq: "D4/1.5 G4/0.5 B4/1 A4/1 " +
+                   "G4/2 D4/2 " +
+                   "E4/1 F#4/1 G4/1 A4/1 " +
+                   "B4/3 A4/1 " +
+                   "G4/1 A4/0.5 B4/0.5 C5/1 B4/1 " +
+                   "A4/2 D4/2 " +
+                   "G4/1 F#4/1 E4/1 D4/1 " +
+                   "G4/4"
+            },
+            {
+              inst: "lowstrings", gain: 0.66,
+              seq: "G2/2 D3/2 G2/2 B2/2 " +
+                   "C3/2 A2/2 D3/2 D3/2 " +
+                   "G2/2 E3/2 A2/2 D3/2 " +
+                   "G2/2 D3/2 G2/4"
+            }
+          ]
+        },
+        {
+          composer: "Antonio Vivaldi",
+          title: "Winter, Op. 8 No. 4 \u2014 Largo",
+          inst: "violin", key: "E-flat major", bpm: 58, style: "cantabile",
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "G4/1 G4/1 G4/0.5 F4/0.5 G4/1 " +
+                   "Ab4/1 G4/1 F4/2 " +
+                   "Eb4/1 F4/1 G4/1 Ab4/1 " +
+                   "Bb4/2.5 Ab4/0.5 G4/1 " +
+                   "C5/1 Bb4/1 Ab4/0.5 G4/0.5 F4/1 " +
+                   "G4/1 F4/1 Eb4/2 " +
+                   "F4/1 Eb4/1 D4/1 Eb4/1 " +
+                   "Eb4/4"
+            },
+            {
+              /* The strings pluck raindrops under the melody throughout. */
+              inst: "pizz", gain: 0.5,
+              seq: "Eb3/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 " +
+                   "Ab2/0.5 Ab2/0.5 Ab2/0.5 Ab2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 " +
+                   "Eb3/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 Cb3/0.5 Cb3/0.5 Cb3/0.5 Cb3/0.5 " +
+                   "Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 " +
+                   "Ab2/0.5 Ab2/0.5 Ab2/0.5 Ab2/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 " +
+                   "Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 Eb3/0.5 " +
+                   "Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 Bb2/0.5 " +
+                   "Eb3/2 Eb2/2"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      title: "Minuets",
+      note: "Three in triple time",
+      tracks: [
+        {
+          composer: "J. S. Bach",
+          title: "Minuet in G, BWV Anh. 114",
+          inst: "violin", key: "G major", bpm: 126,
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "D5/1 G4/0.5 A4/0.5 B4/0.5 C5/0.5 " +
+                   "D5/1 G4/1 G4/1 " +
+                   "E5/1 C5/0.5 D5/0.5 E5/0.5 F#5/0.5 " +
+                   "G5/1 G4/1 G4/1 " +
+                   "C5/1 D5/0.5 C5/0.5 B4/0.5 A4/0.5 " +
+                   "B4/1 C5/0.5 B4/0.5 A4/0.5 G4/0.5 " +
+                   "F#4/1 G4/0.5 A4/0.5 B4/1 " +
+                   "A4/3 " +
+                   "D5/1 G4/0.5 A4/0.5 B4/0.5 C5/0.5 " +
+                   "D5/1 G4/1 G4/1 " +
+                   "E5/1 C5/0.5 D5/0.5 E5/0.5 F#5/0.5 " +
+                   "G5/1 G4/1 G4/1 " +
+                   "C5/1 D5/0.5 C5/0.5 B4/0.5 A4/0.5 " +
+                   "B4/1 C5/0.5 B4/0.5 A4/0.5 F#4/0.5 " +
+                   "G4/1 A4/0.5 B4/0.5 C5/0.5 A4/0.5 " +
+                   "G4/3"
+            },
+            {
+              inst: "cello", gain: 0.66,
+              seq: "G2/3 G2/1.5 D3/1.5 " +
+                   "C3/1.5 D3/1.5 G2/3 " +
+                   "C3/1.5 A2/1.5 G2/1.5 D3/1.5 " +
+                   "D3/3 D3/3 " +
+                   "G2/3 G2/1.5 D3/1.5 " +
+                   "C3/1.5 D3/1.5 G2/3 " +
+                   "C3/1.5 A2/1.5 G2/1.5 D3/1.5 " +
+                   "D3/1.5 D3/1.5 G2/3"
+            }
+          ]
+        },
+        {
+          composer: "Luigi Boccherini",
+          title: "Minuet, String Quintet Op. 11 No. 5",
+          inst: "ens", key: "A major", bpm: 132,
+          /* Strain, contrasting strain in the dominant, then the strain again
+             \u2014 the shape every minuet of the period is built on. */
+          parts: (function () {
+            var melA =
+              "A4/1 E5/0.5 E5/0.5 E5/1 " +
+              "A5/1 G#5/0.5 F#5/0.5 E5/1 " +
+              "D5/0.5 C#5/0.5 B4/0.5 C#5/0.5 D5/0.5 E5/0.5 " +
+              "C#5/2 r/1 " +
+              "A4/1 E5/0.5 E5/0.5 E5/1 " +
+              "A5/1 G#5/0.5 F#5/0.5 E5/1 " +
+              "D5/0.5 E5/0.5 C#5/0.5 D5/0.5 B4/0.5 C#5/0.5 " +
+              "A4/2 r/1 ";
+            var melB =
+              "B4/1 E5/0.5 E5/0.5 E5/1 " +
+              "B5/1 A5/0.5 G#5/0.5 F#5/1 " +
+              "E5/0.5 F#5/0.5 G#5/0.5 A5/0.5 B5/0.5 G#5/0.5 " +
+              "E5/2 r/1 " +
+              "A4/1 E5/0.5 E5/0.5 E5/1 " +
+              "A5/1 G#5/0.5 F#5/0.5 E5/1 " +
+              "D5/0.5 E5/0.5 C#5/0.5 D5/0.5 B4/0.5 C#5/0.5 " +
+              "A4/2 r/1 ";
+            var pizA =
+              "A2/1 E3/1 A3/1 A2/1 E3/1 A3/1 " +
+              "D3/1 A3/1 D4/1 A2/1 E3/1 A3/1 " +
+              "A2/1 E3/1 A3/1 A2/1 E3/1 A3/1 " +
+              "E2/1 B2/1 E3/1 A2/1 E3/1 A3/1 ";
+            var pizB =
+              "E3/1 B3/1 E4/1 E2/1 B2/1 E3/1 " +
+              "B2/1 F#3/1 B3/1 E3/1 B3/1 E4/1 " +
+              "A2/1 E3/1 A3/1 E2/1 B2/1 E3/1 " +
+              "D3/1 A3/1 D4/1 A2/1 E3/1 A3/1 ";
+            return [
+              { inst: "violin", gain: 1, seq: melA + melB + melA },
+              { inst: "pizz", gain: 0.62, seq: pizA + pizB + pizA }
+            ];
+          })()
+        },
+        {
+          composer: "J. S. Bach",
+          title: "Minuet in G minor, BWV Anh. 115",
+          inst: "cello", key: "G minor", bpm: 118,
+          parts: (function () {
+            var mel =
+              "G3/1 A3/0.5 Bb3/0.5 C4/0.5 D4/0.5 " +
+              "Eb4/1 D4/1 G3/1 " +
+              "F4/1 Eb4/0.5 D4/0.5 C4/0.5 Bb3/0.5 " +
+              "A3/1 Bb3/1 C4/1 " +
+              "D4/1 C4/0.5 Bb3/0.5 A3/0.5 G3/0.5 " +
+              "Bb3/1 A3/0.5 G3/0.5 F#3/0.5 A3/0.5 " +
+              "G3/1 D4/0.5 C4/0.5 Bb3/0.5 A3/0.5 " +
+              "G3/3 ";
+            var bass =
+              "G2/3 Eb2/1.5 D3/1.5 " +
+              "Bb2/1.5 Eb3/1.5 F#2/1.5 D3/1.5 " +
+              "G2/1.5 Eb3/1.5 D3/1.5 D3/1.5 " +
+              "G2/1.5 D3/1.5 G2/3 ";
+            /* The strain is marked to repeat, so it plays twice. */
+            return [
+              { inst: "cello", gain: 1, seq: mel + mel },
+              { inst: "lowstrings", gain: 0.6, seq: bass + bass }
+            ];
+          })()
+        }
+      ]
+    },
+
+    {
+      title: "Cello, singing",
+      note: "The long line",
+      tracks: [
+        {
+          composer: "J. S. Bach",
+          title: "Prelude, Cello Suite No. 1 in G, BWV 1007",
+          inst: "cello", key: "G major", bpm: 66,
+          parts: [{
+            inst: "cello", gain: 1,
+            seq: (function () {
+              /* Each bar is one eight-note figure played twice \u2014 the pattern
+                 that made the piece: a single line implying four voices. */
+              var bars = [
+                "G2 D3 B3 A3 B3 D3 B3 D3",
+                "G2 E3 C4 B3 C4 E3 C4 E3",
+                "G2 F#3 C4 B3 C4 F#3 C4 F#3",
+                "G2 F#3 B3 A3 B3 F#3 B3 F#3",
+                "G2 D3 B3 A3 B3 D3 B3 D3",
+                "G2 E3 C4 B3 C4 E3 C4 E3",
+                "G2 F#3 C4 B3 C4 F#3 C4 F#3",
+                "G2 F#3 B3 A3 B3 F#3 B3 F#3"
+              ];
+              var out = [];
+              for (var i = 0; i < bars.length; i++) {
+                var fig = bars[i].split(" ");
+                for (var rep = 0; rep < 2; rep++) {
+                  for (var j = 0; j < fig.length; j++) out.push(fig[j] + "/0.25");
+                }
+              }
+              out.push("G2+D3+G3+B3/4");
+              return out.join(" ");
+            })()
+          }]
+        },
+        {
+          composer: "Camille Saint-Sa\u00ebns",
+          title: "The Swan, from Carnival of the Animals",
+          inst: "cello", key: "G major", bpm: 62, style: "cantabile",
+          parts: [
+            {
+              inst: "cello", gain: 1,
+              seq: "B4/2 A4/1 G4/1 F#4/1 G4/1 " +
+                   "A4/3 D5/3 " +
+                   "C5/1 B4/1 A4/1 G4/1 F#4/2 " +
+                   "G4/6 " +
+                   "D5/2 C5/1 B4/1 A4/1 B4/1 " +
+                   "C5/3 A4/3 " +
+                   "G4/2 F#4/1 E4/1 D4/2 " +
+                   "G4/6"
+            },
+            {
+              /* The two pianos ripple underneath; here, a harp-like arpeggio
+                 on plucked strings so it never competes with the cello. */
+              inst: "pizz", gain: 0.44,
+              seq: (function () {
+                var chords = [
+                  "G2 D3 G3 B3", "G2 D3 G3 B3",
+                  "D2 A2 D3 F#3", "D2 A2 D3 F#3",
+                  "C3 G3 C4 E4", "A2 E3 A3 C4",
+                  "G2 D3 G3 B3", "D2 A2 D3 F#3",
+                  "G2 D3 G3 B3", "G2 D3 G3 B3",
+                  "C3 G3 C4 E4", "A2 E3 A3 C4",
+                  "D2 A2 D3 F#3", "D2 A2 D3 F#3",
+                  "G2 D3 G3 B3", "G2 D3 G3 B3"
+                ];
+                var out = [];
+                for (var i = 0; i < chords.length; i++) {
+                  var n = chords[i].split(" ");
+                  /* up and back down inside the bar */
+                  var run = [n[0], n[1], n[2], n[3], n[2], n[1]];
+                  for (var j = 0; j < run.length; j++) out.push(run[j] + "/0.5");
+                }
+                return out.join(" ");
+              })()
+            }
+          ]
+        },
+        {
+          composer: "Gabriel Faur\u00e9",
+          title: "\u00c9l\u00e9gie, Op. 24",
+          inst: "cello", key: "C minor", bpm: 52, style: "dupre",
+          parts: [
+            {
+              inst: "cello", gain: 1,
+              seq: "G3/2 G3/1 Ab3/1 " +
+                   "G3/2 F3/1 Eb3/1 " +
+                   "D3/2 Eb3/1 F3/1 " +
+                   "G3/4 " +
+                   "G3/2 G3/1 Ab3/1 " +
+                   "Bb3/2 Ab3/1 G3/1 " +
+                   "F3/1 Eb3/1 D3/1 C3/1 " +
+                   "C3/4"
+            },
+            {
+              inst: "lowstrings", gain: 0.58,
+              seq: "C2/2 G2/2 C2/2 Eb2/2 " +
+                   "Bb2/2 F2/2 C2/2 G2/2 " +
+                   "C2/2 G2/2 Ab2/2 Eb2/2 " +
+                   "F2/2 G2/2 C2/4"
+            }
+          ]
+        },
+        {
+          composer: "Jules Massenet",
+          title: "M\u00e9ditation from Tha\u00efs",
+          inst: "violin", key: "D major", bpm: 60, style: "cantabile",
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "A4/1 " +
+                   "D5/1.5 E5/0.5 F#5/1 E5/1 " +
+                   "D5/2 A5/2 " +
+                   "G5/1 F#5/1 E5/1 D5/1 " +
+                   "C#5/2 A4/2 " +
+                   "D5/1.5 E5/0.5 F#5/1 A5/1 " +
+                   "B5/2 A5/2 " +
+                   "G5/1 F#5/1 E5/1 C#5/1 " +
+                   "D5/4"
+            },
+            {
+              inst: "strings", gain: 0.5,
+              seq: "r/1 " +
+                   "D3+A3+D4/4 " +
+                   "D3+A3+D4/2 A2+E3+A3/2 " +
+                   "G2+D3+G3/2 A2+E3+A3/2 " +
+                   "A2+E3+A3/2 A2+E3+A3/2 " +
+                   "D3+A3+D4/4 " +
+                   "G2+D3+G3/2 D3+A3+D4/2 " +
+                   "A2+E3+A3/4 " +
+                   "D3+A3+D4/4"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      title: "Full strings",
+      note: "No winds, no brass",
+      tracks: [
+        {
+          composer: "Johann Pachelbel",
+          title: "Canon in D",
+          inst: "ens", key: "D major", bpm: 60,
+          parts: [
+            {
+              /* Violin enters after one turn of the ground, viola after two.
+                 Both run five turns in total so all three land on the last
+                 chord together. */
+              inst: "violin", gain: 1,
+              seq: "r/16 " +
+                   /* first statement: two notes per chord of the ground */
+                   "F#5/2 E5/2 D5/2 C#5/2 B4/2 A4/2 B4/2 C#5/2 " +
+                   /* the running variation everyone knows */
+                   "D5/1 F#5/1 A5/1 G5/1 F#5/1 D5/1 F#5/1 E5/1 " +
+                   "D5/1 B4/1 D5/1 A5/1 G5/1 B4/1 A5/1 G5/1 " +
+                   "F#5/1 D5/1 E5/1 C#5/1 D5/1 F#5/1 A5/1 G5/1 " +
+                   "F#5/1 E5/1 D5/1 B4/1 A4/1 B4/1 C#5/1 A4/1 " +
+                   "D5/1 F#5/1 A5/1 F#5/1 G5/1 E5/1 C#5/1 E5/1 " +
+                   "D5/1 B4/1 G4/1 B4/1 A4/2 A4/2 " +
+                   "D5/4"
+            },
+            {
+              inst: "viola", gain: 0.72,
+              seq: "r/32 " +
+                   "F#4/2 E4/2 D4/2 C#4/2 B3/2 A3/2 B3/2 C#4/2 " +
+                   "D4/1 F#4/1 A4/1 G4/1 F#4/1 D4/1 F#4/1 E4/1 " +
+                   "D4/1 B3/1 D4/1 A4/1 G4/1 B3/1 A4/1 G4/1 " +
+                   "F#4/1 D4/1 E4/1 C#4/1 D4/1 F#4/1 A4/1 G4/1 " +
+                   "F#4/1 E4/1 D4/1 B3/1 A3/1 B3/1 C#4/1 A3/1 " +
+                   "F#4/4"
+            },
+            {
+              /* The ground: D A B F# G D G A, eight bars, over and over.
+                 Everything above is built on it. */
+              inst: "lowstrings", gain: 0.78,
+              seq: (function () {
+                var ground = ["D2", "A2", "B2", "F#2", "G2", "D2", "G2", "A2"];
+                var out = [];
+                for (var cycle = 0; cycle < 5; cycle++) {
+                  for (var i = 0; i < ground.length; i++) out.push(ground[i] + "/2");
+                }
+                out.push("D2/4");
+                return out.join(" ");
+              })()
+            }
+          ]
+        },
+        {
+          composer: "W. A. Mozart",
+          title: "Eine kleine Nachtmusik, K. 525 \u2014 Allegro",
+          inst: "ens", key: "G major", bpm: 132,
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "G4/1 D4/1 G4/0.5 D4/0.5 G4/0.5 B4/0.5 " +
+                   "D5/1 r/1 D5/1 r/1 " +
+                   "D5/1 A4/1 D5/0.5 A4/0.5 D5/0.5 F#5/0.5 " +
+                   "A5/1 r/1 A5/1 r/1 " +
+                   "G5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 " +
+                   "G5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 D5/0.5 " +
+                   "G5/0.5 A5/0.5 B5/0.5 C6/0.5 D6/1 D5/1 " +
+                   "G5/2 r/2 " +
+                   /* the scale plunges back down and the movement cadences */
+                   "D6/0.5 C6/0.5 B5/0.5 A5/0.5 G5/0.5 F#5/0.5 E5/0.5 D5/0.5 " +
+                   "C5/0.5 B4/0.5 A4/0.5 G4/0.5 F#4/1 A4/1 " +
+                   "D5/1 G5/1 B5/1 G5/1 " +
+                   "D5/2 r/2 " +
+                   "G5/1 F#5/0.5 G5/0.5 A5/1 G5/1 " +
+                   "F#5/1 E5/1 D5/2 " +
+                   "C5/0.5 B4/0.5 A4/0.5 B4/0.5 C5/1 A4/1 " +
+                   "G4/2 r/2"
+            },
+            {
+              inst: "viola", gain: 0.6,
+              seq: "B3/1 A3/1 B3/0.5 A3/0.5 B3/0.5 D4/0.5 " +
+                   "B3/1 r/1 B3/1 r/1 " +
+                   "F#3/1 F#3/1 F#3/0.5 F#3/0.5 A3/0.5 C4/0.5 " +
+                   "C4/1 r/1 C4/1 r/1 " +
+                   "B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 " +
+                   "B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 B3/0.5 " +
+                   "B3/1 C4/1 B3/1 A3/1 " +
+                   "B3/2 r/2 " +
+                   "A4/2 F#4/2 " +
+                   "D4/2 D4/2 " +
+                   "B3/2 B3/2 " +
+                   "B3/2 r/2 " +
+                   "D4/1 D4/1 D4/1 D4/1 " +
+                   "A3/1 A3/1 C4/2 " +
+                   "E4/1 D4/1 E4/1 C4/1 " +
+                   "B3/2 r/2"
+            },
+            {
+              inst: "lowstrings", gain: 0.74,
+              seq: "G2/1 D3/1 G2/1 G2/1 " +
+                   "G2/1 r/1 G2/1 r/1 " +
+                   "D2/1 A2/1 D2/1 D2/1 " +
+                   "D2/1 r/1 D2/1 r/1 " +
+                   "G2/2 G2/2 G2/2 G2/2 " +
+                   "D3/2 D3/2 " +
+                   "G2/2 r/2 " +
+                   "D2/2 D2/2 " +
+                   "D2/2 D2/2 " +
+                   "G2/2 G2/2 " +
+                   "G2/2 r/2 " +
+                   "G2/2 D3/2 " +
+                   "D2/2 D2/2 " +
+                   "C3/2 D3/2 " +
+                   "G2/2 r/2"
+            }
+          ]
+        },
+        {
+          composer: "J. S. Bach",
+          title: "Air on the G String, BWV 1068",
+          inst: "ens", key: "D major", bpm: 58, style: "cantabile",
+          parts: [
+            {
+              inst: "violin", gain: 1,
+              seq: "F#5/3.5 G5/0.5 " +
+                   "F#5/1 E5/1 D5/1.5 C#5/0.5 " +
+                   "B4/2 A4/1 B4/1 " +
+                   "A4/4 " +
+                   "D5/2.5 E5/0.5 F#5/1 " +
+                   "G5/1 F#5/1 E5/2 " +
+                   "D5/1 C#5/1 B4/1 A4/1 " +
+                   "D5/4"
+            },
+            {
+              inst: "viola", gain: 0.58,
+              seq: "A4/2 A4/2 " +
+                   "A4/2 A4/2 " +
+                   "G4/2 F#4/2 " +
+                   "E4/4 " +
+                   "F#4/2 A4/2 " +
+                   "B4/2 A4/2 " +
+                   "A4/2 F#4/2 " +
+                   "F#4/4"
+            },
+            {
+              /* The walking bass \u2014 even quarters, never hurrying. */
+              inst: "lowstrings", gain: 0.76,
+              seq: "D2/1 D2/1 C#2/1 D2/1 " +
+                   "B2/1 B2/1 A2/1 G2/1 " +
+                   "G2/1 F#2/1 E2/1 E2/1 " +
+                   "A2/1 A2/1 A2/1 A2/1 " +
+                   "D2/1 D2/1 D2/1 D2/1 " +
+                   "G2/1 G2/1 A2/1 A2/1 " +
+                   "D3/1 A2/1 G2/1 A2/1 " +
+                   "D2/4"
+            }
+          ]
+        },
+        {
+          composer: "J. S. Bach",
+          title: "Brandenburg Concerto No. 6 \u2014 opening",
+          inst: "viola", key: "B-flat major", bpm: 104,
+          parts: (function () {
+            /* The only concerto Bach wrote with no violins at all: two violas
+               chase each other in canon exactly one quaver apart, which is
+               what produces the shimmer. Both parts read the same figure. */
+            var figure = [
+              "Bb3 Bb3 A3 Bb3 C4 Bb3 D4 Bb3",
+              "Eb4 Bb3 D4 Bb3 C4 Bb3 A3 Bb3",
+              "F4 Bb3 Eb4 Bb3 D4 Bb3 C4 Bb3",
+              "Bb3 D4 F4 D4 Eb4 C4 A3 C4",
+              "Bb3 D4 F4 Bb4 A4 F4 D4 F4",
+              "Eb4 C4 A3 C4 Bb3 Bb3 Bb3 Bb3",
+              "D4 Bb3 F4 Bb3 Eb4 Bb3 D4 Bb3",
+              "C4 A3 F4 A3 Bb3 Bb3 D4 Bb3",
+              "G4 Eb4 C4 Eb4 F4 D4 Bb3 D4",
+              "Eb4 C4 A3 C4 D4 Bb3 G3 Bb3",
+              "C4 A3 F3 A3 Bb3 D4 F4 D4",
+              "Eb4 C4 A3 C4 Bb3 Bb3 Bb3 Bb3"
+            ].join(" ").split(" ");
+
+            var line = figure.map(function (n) { return n + "/0.5"; }).join(" ");
+
+            var bass = [
+              "Bb2 Bb2 Bb2 Bb2", "Eb2 Eb2 F2 F2", "Bb2 Bb2 Eb2 Eb2",
+              "Bb2 Bb2 F2 F2", "Bb2 Bb2 D3 D3", "Eb3 C3 F2 F2",
+              "Bb2 Bb2 Bb2 Bb2", "F2 F2 F2 F2", "Eb2 Eb2 C3 C3",
+              "F2 F2 Bb2 Bb2", "F2 F2 D3 D3", "Eb3 C3 F2 F2"
+            ].join(" ").split(" ").map(function (n) { return n + "/1"; }).join(" ");
+
+            return [
+              { inst: "viola", gain: 1, seq: line + " Bb3/2" },
+              /* one quaver behind, all the way through */
+              { inst: "viola", gain: 0.8, seq: "r/0.5 " + line + " D4/2" },
+              { inst: "lowstrings", gain: 0.72, seq: bass + " Bb2/2" }
+            ];
+          })()
+        },
+        {
+          composer: "Johann Pachelbel",
+          title: "Canon ground \u2014 bass alone",
+          inst: "bass", key: "D major", bpm: 62,
+          parts: [{
+            inst: "bass", gain: 1,
+            seq: (function () {
+              var ground = ["D2", "A1", "B1", "F#1", "G1", "D2", "G1", "A1"];
+              var out = [];
+              for (var c = 0; c < 3; c++) {
+                for (var i = 0; i < ground.length; i++) out.push(ground[i] + "/2");
+              }
+              out.push("D2/4");
+              return out.join(" ");
+            })()
+          }]
+        }
+      ]
+    }
+  ];
+
+  /* ================================================================= audio */
+
+  var ac = null, master = null, dry = null, wet = null, verb = null, analyser = null;
+  var scopeData = null;
+
+  function makeIR(seconds, decay) {
+    var len = Math.floor(ac.sampleRate * seconds);
+    var buf = ac.createBuffer(2, len, ac.sampleRate);
+    for (var ch = 0; ch < 2; ch++) {
+      var d = buf.getChannelData(ch);
+      for (var i = 0; i < len; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+    }
+    return buf;
+  }
+
+  function initAudio() {
+    if (ac) return;
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    ac = new Ctx();
+
+    master = ac.createGain();
+    master.gain.value = volFromSlider();
+
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.6;
+    scopeData = new Uint8Array(analyser.fftSize);
+
+    /* Longest delay loop the model can need: the bass low E, with room. */
+    MAX_DELAY_SAMPLES = Math.ceil(ac.sampleRate / 28) + 16;
+
+    verb = ac.createConvolver();
+    verb.buffer = makeIR(3.4, 2.2);
+
+    /* A little air before the tail arrives \u2014 without it the reverb sits on
+       top of the note instead of behind it. */
+    var pre = ac.createDelay(0.2);
+    pre.delayTime.value = 0.024;
+
+    /* Roll the top off the tail so the hall sounds like wood, not glass, and
+       clear the bottom so low cello notes stay defined. */
+    var verbTone = ac.createBiquadFilter();
+    verbTone.type = "lowpass";
+    verbTone.frequency.value = 3400;
+    var verbLow = ac.createBiquadFilter();
+    verbLow.type = "highpass";
+    verbLow.frequency.value = 130;
+
+    dry = ac.createGain(); dry.gain.value = 0.78;
+    wet = ac.createGain(); wet.gain.value = 0.40;
+
+    dry.connect(master);
+    wet.connect(pre);
+    pre.connect(verb);
+    verb.connect(verbLow);
+    verbLow.connect(verbTone);
+    verbTone.connect(master);
+
+    var limiter = ac.createDynamicsCompressor();
+    limiter.threshold.value = -6;
+    limiter.knee.value = 6;
+    limiter.ratio.value = 8;
+    limiter.attack.value = 0.004;
+    limiter.release.value = 0.18;
+
+    master.connect(limiter);
+    limiter.connect(analyser);
+    analyser.connect(ac.destination);
+  }
+
+  /* ==================================================== bowed string model */
+
+  /* Additive and subtractive synthesis cannot sound like a cello, and no
+     amount of filter tuning rescues them: a stack of detuned sawtooths is
+     how you build a synth pad, and its harmonics are frozen. A real bowed
+     string has harmonics that are born out of the string's own motion and
+     fluctuate continuously, because the bow grabs the string, drags it,
+     loses grip and catches again hundreds of times a second.
+
+     So the string is modelled instead of imitated. It is a delay loop \u2014 a
+     wave travelling to the bridge and back \u2014 with a stick-slip friction
+     curve injecting energy where the bow sits, and a damping filter at the
+     bridge deciding how fast the harmonics die away. This is the digital
+     waveguide of Smith and of McIntyre-Woodhouse-Schumacher, the same
+     family of model STK uses. Everything expressive falls out of the
+     physics: bowing harder is louder AND brighter because it really does
+     inject more high harmonics, and vibrato shortens the string the way a
+     finger does rather than detuning an oscillator. */
+
+  function Delay(maxLen) {
+    this.b = new Float32Array(maxLen);
+    this.max = maxLen;
+    this.inP = 0; this.outP = 0; this.alpha = 0; this.om = 1; this.last = 0;
+  }
+  Delay.prototype.set = function (d) {
+    if (d < 1.5) d = 1.5;
+    if (d > this.max - 2) d = this.max - 2;
+    var op = this.inP - d;
+    while (op < 0) op += this.max;
+    this.outP = Math.floor(op);
+    this.alpha = op - this.outP;
+    this.om = 1 - this.alpha;
+  };
+  Delay.prototype.tick = function (x) {
+    this.b[this.inP++] = x;
+    if (this.inP >= this.max) this.inP = 0;
+    var n = this.outP + 1; if (n >= this.max) n = 0;
+    this.last = this.b[this.outP] * this.om + this.b[n] * this.alpha;
+    this.outP = n;
+    return this.last;
+  };
+
+  /* The friction curve. Below a threshold of relative speed the hair holds
+     the string and drags it; past it the string breaks free and slips back.
+     That discontinuity is the entire sound of a bow. */
+  function bowFriction(v, slope, offset) {
+    var s = Math.abs((v + offset) * slope) + 0.75;
+    s *= s; s *= s;
+    s = 1 / s;
+    return s > 1 ? 1 : s;
+  }
+
+  var MAX_DELAY_SAMPLES = 0;
+
+  function renderBowed(prof, freq, fromFreq, slide, dur, expr, vibScale) {
+    var fs = ac.sampleRate;
+    var tail = prof.tail;
+    var N = Math.ceil((dur + tail) * fs);
+    var buf = ac.createBuffer(1, N, fs);
+    var out = buf.getChannelData(0);
+
+    var neck = new Delay(MAX_DELAY_SAMPLES);
+    var bridge = new Delay(MAX_DELAY_SAMPLES);
+
+    /* Bridge damping. Closer to 1 sustains longer and keeps more harmonics,
+       which is most of the difference between a cello and a viola. */
+    var pole = prof.pole;
+    var loopGain = prof.damp;
+    var b0 = (1 - pole) * loopGain;
+    var fy = 0;
+
+    /* More bow speed is more sound and more edge \u2014 the physical model gives
+       the timbre change for free, so dynamics need no filter trickery. */
+    var bowVel = prof.bowVel * (0.45 + 0.72 * expr);
+    var slope = prof.bowSlope * (1.18 - 0.3 * expr);
+    var bowPos = prof.bowPos + (Math.random() - 0.5) * 0.004;
+
+    var atk = Math.min(prof.bowAtk, dur * 0.45);
+    var rel = Math.min(prof.bowRel, dur * 0.5);
+    var relStart = dur - rel;
+
+    var vibRate = prof.vibRate + (Math.random() - 0.5) * 0.65;
+    var vibDepth = prof.vibDepth * (vibScale === undefined ? 1 : vibScale);
+    var vibPhase = Math.random() * 6.2832;
+
+    /* A real arm does not hold a constant speed or pressure, and a real hand
+       does not hold a pitch to the cent. Both wander slowly. */
+    var fluc = 0, flucTo = 0, drift = 0, driftTo = 0;
+
+    var invFs = 1 / fs;
+    var i, t, env, f, vd, base, bridgeRefl, nutRefl, velDiff, newVel, peak = 0;
+
+    for (i = 0; i < N; i++) {
+      t = i * invFs;
+
+      /* Retune 1500 times a second \u2014 far finer than vibrato needs, far
+         cheaper than doing it per sample. */
+      if ((i & 31) === 0) {
+        f = freq;
+        if (slide > 0 && t < slide) {
+          f = fromFreq * Math.pow(freq / fromFreq, t / slide);
+        }
+        f *= 1 + drift * 0.0018;          /* +-3 cents of human unsteadiness */
+        if (vibDepth > 0) {
+          /* Vibrato is not instant: the hand settles, then widens. */
+          vd = vibDepth * Math.min(1, Math.max(0, (t - 0.12) / 0.55));
+          f *= Math.pow(2, vd * Math.sin(vibPhase + 6.2832 * vibRate * t) / 1200);
+        }
+        /* The sounding loop is longer than the two delay lines: the damping
+           filter adds phase too, and how much depends on the frequency, so a
+           fixed correction detunes one end of the register to tune the other.
+           This is the one-pole's exact phase delay at the fundamental, plus a
+           structural constant for the loop itself. Measured from the bass low
+           E to the violin's top C, every register lands inside 3.5 cents. */
+        var w = 6.2831853 * f / fs;
+        var fd = Math.atan2(pole * Math.sin(w), 1 - pole * Math.cos(w)) / w;
+        base = fs / f - fd - 2;
+        bridge.set(base * bowPos);
+        neck.set(base * (1 - bowPos));
+      }
+
+      if ((i & 63) === 0) {
+        if (Math.random() < 0.06) flucTo = (Math.random() - 0.5) * 2;
+        if (Math.random() < 0.03) driftTo = (Math.random() - 0.5) * 2;
+        fluc += (flucTo - fluc) * 0.05;
+        drift += (driftTo - drift) * 0.04;
+      }
+
+      if (t < atk) env = t / atk;
+      else if (t >= relStart) env = Math.max(0, 1 - (t - relStart) / rel);
+      else env = 1;
+      /* A held note is never perfectly steady under a real arm. */
+      if (env > 0) env *= 1 + 0.03 * Math.sin(6.2832 * 0.7 * t + vibPhase);
+
+      /* Bow hair is not smooth; the hiss belongs in the excitation, not
+         bolted on afterwards. */
+      /* The bow bites harder for an instant as it catches, then settles. */
+      var grab = t < atk * 1.6 ? 1 + 0.22 * (1 - t / (atk * 1.6)) : 1;
+      var v = bowVel * env * grab * (1 + fluc * 0.075) +
+              (Math.random() - 0.5) * prof.bowNoise * env;
+
+      fy = b0 * bridge.last + pole * fy;      /* bridge damping filter */
+      bridgeRefl = -fy;                        /* inverting reflection */
+      nutRefl = -neck.last;
+      velDiff = v - (bridgeRefl + nutRefl);
+      newVel = velDiff * bowFriction(velDiff, slope, prof.bowOff);
+
+      neck.tick(bridgeRefl + newVel);
+      bridge.tick(nutRefl + newVel);
+
+      out[i] = bridge.last;
+      if (out[i] > peak) peak = out[i];
+      else if (-out[i] > peak) peak = -out[i];
+    }
+
+    /* Normalise so note-to-note balance is set by the score, not by however
+       much energy this particular pitch happened to accumulate. Timbre is
+       untouched by a scale factor, so loud-is-bright survives. */
+    if (peak > 0.0001) {
+      var g = 0.92 / peak;
+      for (i = 0; i < N; i++) out[i] *= g;
+    }
+    return buf;
+  }
+
+  /* Plucked: no bow, just a struck string left to ring. The same loop, given
+     a burst of noise and nothing more. */
+  function renderPluck(prof, freq, dur) {
+    var fs = ac.sampleRate;
+    var N = Math.ceil((dur + prof.tail) * fs);
+    var buf = ac.createBuffer(1, N, fs);
+    var out = buf.getChannelData(0);
+    var L = Math.max(2, Math.round(fs / freq));
+    var line = new Float32Array(L);
+    var i;
+    for (i = 0; i < L; i++) line[i] = Math.random() * 2 - 1;
+
+    var p = 0, prev = 0, peak = 0, g = prof.damp;
+    for (i = 0; i < N; i++) {
+      var cur = line[p];
+      var y = (cur + prev) * 0.5 * g;
+      prev = cur;
+      line[p] = y;
+      p = (p + 1) % L;
+      out[i] = y;
+      if (y > peak) peak = y; else if (-y > peak) peak = -y;
+    }
+    if (peak > 0.0001) {
+      var s = 0.9 / peak;
+      for (i = 0; i < N; i++) out[i] *= s;
+    }
+    return buf;
+  }
+
+  /* ========================================================== the instrument */
+
+  /* The string alone is not the instrument. A bowed string's signal is very
+     nearly a sawtooth - that is what Helmholtz motion produces at the bridge,
+     and it is why a waveguide on its own still sounds synthetic. Everything
+     that makes a cello sound like a cello rather than a buzzer happens after
+     the bridge, in the box: a spruce top, a maple back, and the air between
+     them resonate at many hundreds of frequencies at once, each with its own
+     decay, and that dense forest of resonances is what colours the sawtooth
+     into wood.
+
+     Four filters cannot do that. So the body is built as an impulse response
+     out of its actual modes - the air resonance, the main wood pair, and a
+     thicket of plate modes thickening with frequency under a broad bridge
+     hill - and the string is played through it. Each mode is generated by a
+     two-pole recursion rather than a sine call, which keeps a hundred and
+     fifty of them cheap. */
+
+  function addMode(d, len, f, amp, Q, fs, phase) {
+    var w = 6.2831853 * f / fs;
+    if (w >= Math.PI) return;
+    var r = Math.exp(-Math.PI * f / (Q * fs));
+    var a1 = 2 * r * Math.cos(w), a2 = -r * r;
+    var y2 = amp * Math.sin(phase);
+    var y1 = amp * r * Math.sin(w + phase);
+    d[0] += y2;
+    if (len > 1) d[1] += y1;
+    for (var n = 2; n < len; n++) {
+      var y = a1 * y1 + a2 * y2;
+      d[n] += y;
+      y2 = y1; y1 = y;
+    }
+  }
+
+  /* How strongly the box radiates at a given frequency: nothing below the air
+     resonance, a broad lift through the bridge hill, and a roll-off on top. */
+  function bodyEnv(f, spec) {
+    var e = 1 / (1 + Math.pow(spec.low / f, 3));
+    var oct = Math.log(f / spec.hill[0]) / Math.LN2 / spec.hill[1];
+    e *= 1 + spec.hill[2] * Math.exp(-oct * oct);
+    e /= 1 + Math.pow(f / spec.top, 2.2);
+    return e;
+  }
+
+  function makeBodyIR(spec) {
+    var fs = ac.sampleRate;
+    var len = Math.floor(fs * 0.26);
+    var buf = ac.createBuffer(2, len, fs);
+    var ch, i, k;
+
+    for (ch = 0; ch < 2; ch++) {
+      var d = buf.getChannelData(ch);
+
+      /* The modes that give each instrument its identity. */
+      for (k = 0; k < spec.modes.length; k++) {
+        var m = spec.modes[k];
+        addMode(d, len, m[0] * (1 + (Math.random() - 0.5) * 0.01),
+                m[1] * bodyEnv(m[0], spec), m[2], fs, Math.random() * 6.2832);
+      }
+
+      /* The plate thicket above them. Irregular on purpose: an evenly spaced
+         set of resonances rings like a comb filter, not like wood. */
+      var f = spec.modes[spec.modes.length - 1][0];
+      var top = Math.min(fs * 0.45, spec.top * 2.4);
+      var guard = 0;
+      while (f < top && guard++ < 700) {
+        f += spec.spacing * (0.45 + Math.random() * 1.5);
+        /* Low modes ring longest: a tapped instrument sounds a pitch, not a
+           click, because the plates hold their lowest modes far longer than
+           their highest. */
+        /* Low modes are sparse and sharply defined; high ones crowd together
+           and merge into the broad bridge hill, so they are damped harder.
+           This is the difference between a box that sounds like wood and one
+           that rings like a plate. */
+        var q = 55 * Math.pow(400 / f, 0.5) * (0.7 + Math.random() * 0.7);
+        if (q < 12) q = 12; else if (q > 75) q = 75;
+        var a = bodyEnv(f, spec) * (0.25 + Math.random() * 1.1);
+        addMode(d, len, f, a, q, fs, Math.random() * 6.2832);
+      }
+    }
+
+    /* Normalise by energy, not by peak. Convolution gain follows the total
+       energy of the response, so a peak-normalised impulse made of a hundred
+       and fifty modes multiplies the signal enormously - which railed the
+       output into distortion. Unit energy per channel keeps the box neutral
+       in level and lets the profiles set the balance. */
+    for (ch = 0; ch < 2; ch++) {
+      var c = buf.getChannelData(ch);
+      var energy = 0;
+      for (i = 0; i < len; i++) energy += c[i] * c[i];
+      if (energy > 0) {
+        var g = 1 / Math.sqrt(energy);
+        for (i = 0; i < len; i++) c[i] *= g;
+      }
+    }
+    return buf;
+  }
+
+  /* One body per instrument, built once and shared by every note it plays -
+     which is also what a real instrument does. */
+  var bodies = {};
+
+  function bodyOf(name, prof) {
+    if (bodies[name]) return bodies[name];
+
+    var input = ac.createGain();
+    var conv = ac.createConvolver();
+    conv.normalize = false;
+    conv.buffer = makeBodyIR(prof.body);
+
+    var radiated = ac.createGain();
+    radiated.gain.value = 1.0;
+
+    /* A little of the string reaches the ear without going through the box;
+       without it the sound loses its edge and its attack. */
+    var direct = ac.createGain();
+    direct.gain.value = prof.direct;
+
+    var out = ac.createGain();
+    out.gain.value = prof.level;
+
+    input.connect(conv);
+    conv.connect(radiated);
+    radiated.connect(out);
+    input.connect(direct);
+    direct.connect(out);
+
+    out.connect(dry);
+    out.connect(wet);
+
+    bodies[name] = input;
+    return input;
+  }
+
+  /* Rendering the same pitch twice is wasted work in a repetitive passage,
+     but a cache that is too eager makes every repeat identical. Keyed
+     loosely and capped, so repeats vary and long pieces stay cheap. */
+  var noteCache = {}, cacheKeys = [];
+
+  function getNote(prof, freq, fromFreq, slide, dur, expr, key, vib) {
+    if (slide > 0) return renderBowed(prof, freq, fromFreq, slide, dur, expr, vib);
+    var k = key + "|" + freq.toFixed(2) + "|" + dur.toFixed(2) +
+            "|" + Math.round(expr * 6) + "|" + vib.toFixed(2) +
+            "|" + (cacheKeys.length & 1);
+    var hit = noteCache[k];
+    if (hit) return hit;
+    var buf = prof.pluck
+      ? renderPluck(prof, freq, dur)
+      : renderBowed(prof, freq, fromFreq, slide, dur, expr, vib);
+    noteCache[k] = buf;
+    cacheKeys.push(k);
+    if (cacheKeys.length > 260) delete noteCache[cacheKeys.shift()];
+    return buf;
+  }
+
+  var live = [];
+
+  function playNote(prof, freq, at, dur, vel, style, fromFreq, expr, key) {
+    expr = expr === undefined ? 1 : expr;
+
+    var slide = 0;
+    if (fromFreq && style.porta > 0 && fromFreq !== freq) {
+      var semis = Math.abs(12 * Math.log(freq / fromFreq) / Math.LN2);
+      if (semis <= style.portaMax) slide = Math.min(style.porta, dur * 0.3);
+    }
+
+    /* Vibrato widens where the player leans hardest, which is most of what
+       makes an emotional peak read as one. */
+    var buf = getNote(prof, freq, fromFreq, slide, dur, expr, key,
+                      style.vib * (0.70 + 0.48 * expr));
+
+    var src = ac.createBufferSource();
+    src.buffer = buf;
+    /* Tiny playback-rate offsets keep repeated notes from being clones. */
+    src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.0015;
+
+    var g = ac.createGain();
+    g.gain.value = vel;
+    src.connect(g);
+    /* Straight into the box, the way a bridge feeds a soundboard. */
+    g.connect(bodyOf(key, prof));
+
+    src.start(at);
+    src.stop(at + buf.duration + 0.02);
+
+    live.push({ env: g, nodes: [src], off: at + buf.duration + 0.05 });
+  }
+
+  /* ============================================================= scheduler */
+
+  var state = {
+    id: null, events: [], idx: 0, startAt: 0, span: 0,
+    tint: "#DE9639", raf: 0, timer: 0
+  };
+
+  function volFromSlider() {
+    var el = document.getElementById("vol");
+    return Math.pow(parseInt(el.value, 10) / 100, 1.6) * 1.15;
+  }
+
+  function tempoScale() {
+    return parseInt(document.getElementById("tempo").value, 10) / 100;
+  }
+
+  function flatten(track) {
+    var bpm = track.bpm * tempoScale();
+    var spb = 60 / bpm;
+    var style = STYLE[track.style || "baroque"];
+    var evs = [];
+    var p, n;
+
+    var parsedParts = [];
+    var span = 0;
+    for (p = 0; p < track.parts.length; p++) {
+      var parsed = shape(parseSeq(track.parts[p].seq), style);
+      parsedParts.push(parsed);
+      if (parsed.beats > span) span = parsed.beats;
+    }
+
+    var warp = timeMap(parsedParts[0].phrases, span, style);
+
+    for (p = 0; p < track.parts.length; p++) {
+      var part = track.parts[p];
+      var prof = INST[part.inst];
+      /* A plucked accompaniment never slides or leans the way a bowed line
+         does, whatever the movement's style. */
+      var partStyle = prof.pluck
+        ? { legato: 0, porta: 0, portaMax: 0, arc: style.arc,
+            vib: 0, atkMul: 1, wet: style.wet, rit: style.rit, ritTail: style.ritTail,
+            human: style.human, rub: style.rub }
+        : style;
+      var gain = part.gain === undefined ? 1 : part.gain;
+
+      for (n = 0; n < parsedParts[p].notes.length; n++) {
+        var note = parsedParts[p].notes[n];
+        var expr = note.vel === undefined ? 1 : note.vel;
+        var t0 = warp(note.beat) * spb + note.roll;
+        var t1 = warp(note.beat + note.dur) * spb;
+        /* Micro-timing. Notes are placed by hand, never on a grid: the start
+           of a phrase leans late, the peak arrives a touch early, and every
+           onset carries a little unrepeatable scatter. Chord members keep
+           their roll, and the bass is steadier than the melody because that
+           is how an ensemble actually holds together. */
+        if (style.human > 0) {
+          var lean = (0.5 - expr) * style.human * 0.055;
+          var scatter = (Math.random() - 0.5) * style.human * 0.030;
+          var shift = (lean + scatter) * (p === 0 ? 1 : 0.45);
+          t0 += shift;
+          t1 += shift;
+          if (t0 < 0) { t1 -= t0; t0 = 0; }
+        }
+        evs.push({
+          t: t0,
+          dur: Math.max(t1 - t0 + partStyle.legato, 0.07),
+          freq: note.freq,
+          midi: note.midi,
+          from: note.from === undefined ? 0 : 440 * Math.pow(2, (note.from - 69) / 12),
+          prof: prof,
+          style: partStyle,
+          vel: gain * expr,
+          expr: expr,
+          key: part.inst,
+          lead: p === 0 && note.top
+        });
+      }
+    }
+    evs.sort(function (a, b) { return a.t - b.t; });
+    return { events: evs, span: warp(span) * spb };
+  }
+
+  function stopAll(quiet) {
+    if (state.timer) { clearInterval(state.timer); state.timer = 0; }
+    if (ac) {
+      var now = ac.currentTime;
+      for (var i = 0; i < live.length; i++) {
+        var L = live[i];
+        try {
+          L.env.gain.cancelScheduledValues(now);
+          L.env.gain.setTargetAtTime(0.0001, now, 0.05);
+          for (var j = 0; j < L.nodes.length; j++) {
+            try { L.nodes[j].stop(now + 0.35); } catch (e) {}
+          }
+        } catch (e) {}
+      }
+    }
+    live = [];
+    state.id = null;
+    state.events = [];
+    state.idx = 0;
+    paintIdle(quiet);
+  }
+
+  function play(track, id, tint) {
+    initAudio();
+    if (ac.state === "suspended") ac.resume();
+
+    stopAll(true);
+
+    var flat = flatten(track);
+    state.id = id;
+    state.events = flat.events;
+    state.span = flat.span;
+    state.idx = 0;
+    state.tint = tint;
+    state.startAt = ac.currentTime + 0.30;
+
+    /* A singing movement wants more hall than a running baroque one. */
+    wet.gain.setTargetAtTime(0.40 * STYLE[track.style || "baroque"].wet,
+                             ac.currentTime, 0.05);
+
+    document.documentElement.style.setProperty("--tint", tint);
+    paintPlaying(track);
+
+    state.timer = setInterval(tick, 25);
+    tick();
+    if (!state.raf) state.raf = requestAnimationFrame(frame);
+  }
+
+  function tick() {
+    if (!state.id) return;
+    var horizon = ac.currentTime + 0.45;
+    while (state.idx < state.events.length &&
+           state.startAt + state.events[state.idx].t < horizon) {
+      var e = state.events[state.idx];
+      playNote(e.prof, e.freq, state.startAt + e.t, e.dur, e.vel,
+               e.style, e.from, e.expr, e.key);
+      state.idx++;
+    }
+    /* Reap finished voices so long pieces do not accumulate nodes. */
+    var now = ac.currentTime;
+    live = live.filter(function (L) { return L.off > now - 0.5; });
+
+    if (state.idx >= state.events.length &&
+        ac.currentTime > state.startAt + state.span + 1.4) {
+      stopAll(false);
+    }
+  }
+
+  /* ================================================================== view */
+
+  var scope = document.getElementById("scope");
+  var sctx = scope.getContext("2d");
+  var scopeTag = document.getElementById("scopeTag");
+  var bar = document.getElementById("bar");
+  var readout = document.getElementById("readout");
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function sizeScope() {
+    var r = scope.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    scope.width = Math.max(1, Math.floor(r.width * dpr));
+    scope.height = Math.max(1, Math.floor(r.height * dpr));
+    if (!state.id) drawFlat();
+  }
+
+  /* At rest the scope shows its graticule and a flat trace, so the panel reads
+     as an instrument waiting rather than an empty box. */
+  function drawFlat() {
+    var w = scope.width, h = scope.height, i;
+    var unit = Math.max(1, w / 900);
+    sctx.clearRect(0, 0, w, h);
+
+    sctx.strokeStyle = "#1A211E";
+    sctx.lineWidth = unit;
+    var ticks = 24;
+    for (i = 1; i < ticks; i++) {
+      var x = Math.round(w * i / ticks) + 0.5;
+      var len = (i % 4 === 0) ? h * 0.18 : h * 0.08;
+      sctx.beginPath();
+      sctx.moveTo(x, h / 2 - len);
+      sctx.lineTo(x, h / 2 + len);
+      sctx.stroke();
+    }
+
+    sctx.strokeStyle = "#2E3A34";
+    sctx.lineWidth = Math.max(1.2, unit * 1.3);
+    sctx.beginPath();
+    sctx.moveTo(0, h / 2 + 0.5);
+    sctx.lineTo(w, h / 2 + 0.5);
+    sctx.stroke();
+  }
+
+  function frame() {
+    state.raf = 0;
+    if (!state.id) { drawFlat(); return; }
+
+    if (!reduced) {
+      analyser.getByteTimeDomainData(scopeData);
+      var w = scope.width, h = scope.height;
+      sctx.clearRect(0, 0, w, h);
+      sctx.lineWidth = Math.max(1.4, w / 700);
+      sctx.strokeStyle = state.tint;
+      sctx.beginPath();
+      var step = w / scopeData.length;
+      for (var i = 0; i < scopeData.length; i++) {
+        var y = (1 - (scopeData[i] - 128) / 128 * 0.86) * h / 2;
+        if (i === 0) sctx.moveTo(0, y); else sctx.lineTo(i * step, y);
+      }
+      sctx.stroke();
+    }
+
+    /* Progress, and the note currently under the bow. */
+    var el = ac.currentTime - state.startAt;
+    var pct = Math.max(0, Math.min(1, el / state.span));
+    bar.style.width = (pct * 100).toFixed(2) + "%";
+
+    var cur = null;
+    for (var k = 0; k < state.events.length; k++) {
+      var e = state.events[k];
+      if (e.lead && e.t <= el && el < e.t + e.dur + 0.06) cur = e;
+      if (e.t > el) break;
+    }
+    if (cur) {
+      var label = nameOf(cur.midi, false);
+      if (readout.textContent !== label) {
+        readout.textContent = label;
+        readout.classList.remove("idle");
+      }
+    }
+
+    state.raf = requestAnimationFrame(frame);
+  }
+
+  function paintPlaying(track) {
+    document.getElementById("nowWho").textContent = track.composer;
+    document.getElementById("nowWhat").textContent = track.title;
+    document.getElementById("stop").disabled = false;
+    scopeTag.textContent = INST[track.parts[0].inst].label + " \u00b7 " + track.key;
+    readout.classList.remove("idle");
+
+    var rows = document.querySelectorAll("[data-track]");
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].setAttribute("aria-current", rows[i].dataset.track === state.id ? "true" : "false");
+    }
+    document.getElementById("announce").textContent = "Playing " + track.title + ", " + track.composer;
+  }
+
+  function paintIdle(quiet) {
+    if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; }
+    drawFlat();
+    bar.style.width = "0%";
+    readout.textContent = "\u2014";
+    readout.classList.add("idle");
+    scopeTag.textContent = "Silent";
+    document.getElementById("stop").disabled = true;
+    document.getElementById("nowWho").textContent = "Arco";
+    document.getElementById("nowWhat").textContent = "Press any title to play";
+    var rows = document.querySelectorAll("[data-track]");
+    for (var i = 0; i < rows.length; i++) rows[i].setAttribute("aria-current", "false");
+    if (!quiet) document.getElementById("announce").textContent = "Finished";
+  }
+
+  function fmt(sec) {
+    var m = Math.floor(sec / 60), s = Math.round(sec % 60);
+    if (s === 60) { m++; s = 0; }
+    return m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  function partBeats(track) {
+    var out = [];
+    for (var i = 0; i < track.parts.length; i++) {
+      out.push(parseSeq(track.parts[i].seq).beats);
+    }
+    return out;
+  }
+
+  function trackSeconds(track) {
+    var span = Math.max.apply(null, partBeats(track));
+    var style = STYLE[track.style || "baroque"];
+    /* Rubato and the closing broadening both add real time, so count them. */
+    var lead = shape(parseSeq(track.parts[0].seq), style);
+    return timeMap(lead.phrases, span, style)(span) * 60 / track.bpm;
+  }
+
+  /* ================================================================ render */
+
+  var lib = document.getElementById("library");
+  var registry = {};
+
+  /* ------------------------------------------------------ players section */
+
+  var byTitle = {};
+  LIBRARY.forEach(function (section) {
+    section.tracks.forEach(function (t) { byTitle[t.title] = t; });
+  });
+
+  var plSec = document.createElement("section");
+  plSec.className = "section";
+  plSec.innerHTML =
+    '<div class="section-head">' +
+      '<h2>The players</h2>' +
+      '<span class="note">Their piece, in this app&rsquo;s voice</span>' +
+    '</div>' +
+    '<div class="rows"></div>';
+  lib.appendChild(plSec);
+
+  var plRows = plSec.querySelector(".rows");
+
+  PLAYERS.forEach(function (pl, i) {
+    var track = byTitle[pl.piece];
+    if (!track) return;                       /* never render a dead button */
+    var id = "pl-" + i;
+    registry[id] = track;
+
+    var btn = document.createElement("button");
+    btn.className = "row";
+    btn.type = "button";
+    btn.dataset.track = id;
+    btn.dataset.inst = pl.inst;
+    btn.dataset.parts = partBeats(track).join(",");
+    btn.setAttribute("aria-current", "false");
+    btn.style.setProperty("--tint", TINTS[pl.inst]);
+
+    var bow = document.createElement("span");
+    bow.className = "bow";
+
+    var mid = document.createElement("span");
+    var who = document.createElement("span");
+    who.className = "who";
+    who.textContent = INST[pl.inst].label + " \u00b7 " + pl.life;
+    var what = document.createElement("span");
+    what.className = "what";
+    what.textContent = pl.name;
+    var why = document.createElement("span");
+    why.className = "why";
+    why.textContent = pl.why;
+    mid.appendChild(who); mid.appendChild(what); mid.appendChild(why);
+
+    var meta = document.createElement("span");
+    meta.className = "meta";
+    var pc = document.createElement("span");
+    pc.className = "piece";
+    pc.textContent = track.title.replace(/ \u2014 .*$/, "");
+    meta.appendChild(pc);
+    meta.appendChild(document.createTextNode(fmt(trackSeconds(track))));
+
+    btn.appendChild(bow); btn.appendChild(mid); btn.appendChild(meta);
+    btn.setAttribute("aria-label",
+      "Play " + track.title + " by " + track.composer + ", the piece " + pl.name + " is known for");
+    btn.addEventListener("click", function () {
+      play(track, id, TINTS[pl.inst]);
+    });
+    plRows.appendChild(btn);
+  });
+
+  /* ----------------------------------------------------- repertoire rows */
+
+  LIBRARY.forEach(function (section, si) {
+    var sec = document.createElement("section");
+    sec.className = "section";
+
+    var head = document.createElement("div");
+    head.className = "section-head";
+    var h2 = document.createElement("h2");
+    h2.textContent = section.title;
+    var nt = document.createElement("span");
+    nt.className = "note";
+    nt.textContent = section.note;
+    head.appendChild(h2); head.appendChild(nt);
+    sec.appendChild(head);
+
+    var rows = document.createElement("div");
+    rows.className = "rows";
+
+    section.tracks.forEach(function (track, ti) {
+      var id = "t" + si + "-" + ti;
+      registry[id] = track;
+
+      var btn = document.createElement("button");
+      btn.className = "row";
+      btn.type = "button";
+      btn.dataset.track = id;
+      btn.dataset.inst = track.inst;
+      /* Beat count of each part \u2014 an accompaniment that stops early is the
+         easiest authoring mistake to make here, so it stays inspectable. */
+      btn.dataset.parts = partBeats(track).join(",");
+      btn.setAttribute("aria-current", "false");
+      btn.style.setProperty("--tint", TINTS[track.inst]);
+
+      var bow = document.createElement("span");
+      bow.className = "bow";
+
+      var mid = document.createElement("span");
+      var who = document.createElement("span");
+      who.className = "who";
+      who.textContent = track.composer;
+      var what = document.createElement("span");
+      what.className = "what";
+      what.textContent = track.title;
+      mid.appendChild(who); mid.appendChild(what);
+
+      var meta = document.createElement("span");
+      meta.className = "meta";
+      var k = document.createElement("span");
+      k.className = "k";
+      k.textContent = track.key;
+      meta.appendChild(k);
+      meta.appendChild(document.createTextNode(fmt(trackSeconds(track))));
+
+      btn.appendChild(bow); btn.appendChild(mid); btn.appendChild(meta);
+      btn.addEventListener("click", function () {
+        play(track, id, TINTS[track.inst]);
+      });
+
+      rows.appendChild(btn);
+    });
+
+    sec.appendChild(rows);
+    lib.appendChild(sec);
+  });
+
+  /* ------------------------------------------------------- scales section */
+
+  var SCALE_KEYS = ["C", "G", "D", "A", "E", "F", "Bb", "Eb"];
+  var scaleInst = "cello";
+
+  var scaleSec = document.createElement("section");
+  scaleSec.className = "section";
+  scaleSec.dataset.scales = "1";
+  scaleSec.innerHTML =
+    '<div class="section-head">' +
+      '<h2>Major scales</h2>' +
+      '<span class="note">Two octaves, up and down</span>' +
+    '</div>' +
+    '<div class="scale-tabs" role="group" aria-label="Instrument for scales"></div>' +
+    '<div class="keys"></div>';
+  lib.appendChild(scaleSec);
+
+  var tabsHost = scaleSec.querySelector(".scale-tabs");
+  var keysHost = scaleSec.querySelector(".keys");
+
+  ["cello", "violin", "viola", "bass"].forEach(function (inst) {
+    var t = document.createElement("button");
+    t.className = "tab";
+    t.type = "button";
+    t.textContent = INST[inst].label;
+    t.dataset.scaleInst = inst;
+    t.style.setProperty("--tint", TINTS[inst]);
+    t.setAttribute("aria-pressed", inst === scaleInst ? "true" : "false");
+    t.addEventListener("click", function () {
+      scaleInst = inst;
+      tabsHost.querySelectorAll(".tab").forEach(function (o) {
+        o.setAttribute("aria-pressed", o.dataset.scaleInst === inst ? "true" : "false");
+      });
+      renderKeys();
+    });
+    tabsHost.appendChild(t);
+  });
+
+  function renderKeys() {
+    keysHost.textContent = "";
+    SCALE_KEYS.forEach(function (key) {
+      var built = buildScale(scaleInst, key);
+      var id = "scale-" + scaleInst + "-" + key;
+      var track = {
+        composer: INST[scaleInst].label,
+        title: key + " major scale",
+        inst: scaleInst,
+        key: built.low + " to " + built.high,
+        bpm: 92,
+        style: "practice",
+        parts: [{ inst: scaleInst, gain: 1, seq: built.seq }]
+      };
+      registry[id] = track;
+
+      var b = document.createElement("button");
+      b.className = "key";
+      b.type = "button";
+      b.dataset.track = id;
+      b.dataset.inst = scaleInst;
+      b.setAttribute("aria-current", "false");
+      b.style.setProperty("--tint", TINTS[scaleInst]);
+
+      var nm = document.createElement("span");
+      nm.className = "name";
+      nm.textContent = key + " major";
+      var rg = document.createElement("span");
+      rg.className = "range";
+      rg.textContent = built.low + " \u2013 " + built.high;
+
+      b.appendChild(nm); b.appendChild(rg);
+      b.setAttribute("aria-label", key + " major scale, " + INST[scaleInst].label +
+                                   ", " + built.low + " to " + built.high);
+      b.addEventListener("click", function () {
+        play(track, id, TINTS[scaleInst]);
+      });
+      keysHost.appendChild(b);
+    });
+    applyFilter();
+  }
+
+  renderKeys();
+
+  /* --------------------------------------------------------------- filter */
+
+  var filter = "all";
+
+  function applyFilter() {
+    var rows = document.querySelectorAll(".row");
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].classList.toggle("is-hidden", filter !== "all" && rows[i].dataset.inst !== filter);
+    }
+    /* Scales follow the instrument tabs, so the section hides only when the
+       filter names an instrument the tabs are not showing. */
+    var scaleMatch = filter === "all" || filter === scaleInst;
+    scaleSec.style.display = scaleMatch ? "" : "none";
+
+    var secs = document.querySelectorAll(".section:not([data-scales])");
+    for (var s = 0; s < secs.length; s++) {
+      var visible = secs[s].querySelectorAll(".row:not(.is-hidden)").length;
+      secs[s].style.display = visible ? "" : "none";
+    }
+  }
+
+  document.querySelectorAll(".chip").forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      filter = chip.dataset.filter;
+      document.querySelectorAll(".chip").forEach(function (c) {
+        c.setAttribute("aria-pressed", c === chip ? "true" : "false");
+      });
+      applyFilter();
+    });
+  });
+
+  /* --------------------------------------------------------------- dials */
+
+  document.getElementById("stop").addEventListener("click", function () {
+    stopAll(true);
+  });
+
+  var tempoEl = document.getElementById("tempo");
+  var tempoOut = document.getElementById("tempoOut");
+  tempoEl.addEventListener("input", function () {
+    tempoOut.textContent = tempoEl.value + "%";
+  });
+  tempoEl.addEventListener("change", function () {
+    /* Restart the current piece so the new tempo takes effect from the top. */
+    if (state.id && registry[state.id]) {
+      var t = registry[state.id];
+      play(t, state.id, TINTS[t.inst]);
+    }
+  });
+
+  var volEl = document.getElementById("vol");
+  var volOut = document.getElementById("volOut");
+  volEl.addEventListener("input", function () {
+    volOut.textContent = volEl.value;
+    if (master) master.gain.setTargetAtTime(volFromSlider(), ac.currentTime, 0.02);
+  });
+
+  /* Keep the page clear of the player bar whatever height it settles at \u2014
+     the dials wrap differently by viewport, so a fixed value would clip. */
+  var playerEl = document.querySelector(".player");
+  function fitBar() {
+    var h = playerEl.getBoundingClientRect().height;
+    document.documentElement.style.setProperty("--bar-h", Math.ceil(h) + "px");
+  }
+  if (window.ResizeObserver) new ResizeObserver(fitBar).observe(playerEl);
+
+  window.addEventListener("resize", function () { sizeScope(); fitBar(); });
+  sizeScope();
+  fitBar();
+  applyFilter();
+})();
+</script>
+
+</body></html>
