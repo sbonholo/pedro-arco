@@ -7,6 +7,49 @@
 <meta name="color-scheme" content="dark">
 <meta name="description" content="Arco: bowed strings simulated from their physics. Cello, violin, viola, double bass and string orchestra.">
 <title>Arco</title>
+<script>
+/* Installed first so a failure anywhere below still leaves the listener a
+   way out. One small toast, shown once; tapping it reloads. */
+(function () {
+  var shown = false, pending = false;
+  function toast() {
+    if (shown) return;
+    if (!document.body) { pending = true; return; }
+    shown = true;
+    var t = document.createElement("button");
+    t.type = "button";
+    t.className = "oops";
+    t.setAttribute("role", "alert");
+    t.textContent = "Something went wrong \u2013 tap to reload";
+    t.addEventListener("click", function () { location.reload(); });
+    document.body.appendChild(t);
+  }
+  window.onerror = function (msg) {
+    /* Layout-observer notices are benign and fire in some hosts. */
+    if (/ResizeObserver loop/.test(String(msg))) return false;
+    toast();
+    return false;
+  };
+  window.addEventListener("unhandledrejection", function () { toast(); });
+  window.addEventListener("DOMContentLoaded", function () {
+    if (pending) toast();
+  });
+})();
+
+/* Storage can be missing, full or blocked (private mode, sandboxed frames),
+   and none of that is allowed to stop the music. */
+var arcoStore = {
+  get: function (k, fallback) {
+    try {
+      var v = window.localStorage.getItem("arco:" + k);
+      return v === null ? fallback : JSON.parse(v);
+    } catch (e) { return fallback; }
+  },
+  set: function (k, v) {
+    try { window.localStorage.setItem("arco:" + k, JSON.stringify(v)); } catch (e) {}
+  }
+};
+</script>
 
 <style>
   :root {
@@ -564,6 +607,26 @@
   }
 
   footer p { margin: 0 0 8px; max-width: 60ch; }
+
+  .oops {
+    position: fixed;
+    left: 50%;
+    top: calc(14px + env(safe-area-inset-top));
+    transform: translateX(-50%);
+    z-index: 60;
+    max-width: calc(100% - 32px);
+    min-height: 44px;
+    padding: 10px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    background: var(--panel-hi);
+    border: 1px solid var(--cello);
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  }
 
   .sr {
     position: absolute; width: 1px; height: 1px;
