@@ -643,6 +643,43 @@ var arcoStore = {
     .dials { gap: 10px; }
   }
 
+  /* Phones and other touch screens: every control is at least a 44px target
+     and no text drops below 12px. The labels keep their mono small-caps
+     voice; they just stop being squinted at. */
+  @media (max-width: 560px), (pointer: coarse) {
+    .wordmark .gloss,
+    .scope-tag,
+    .chip,
+    .tab,
+    .section-head .note,
+    .row .who,
+    .row .meta,
+    .key .range,
+    .now .who,
+    .dial label,
+    .dial output,
+    footer { font-size: 12px; }
+
+    .chip, .tab { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
+    .chip { padding-left: 16px; padding-right: 16px; }
+    .filters { gap: 8px 8px; }
+
+    input[type="range"] { height: 44px; }
+    input[type="range"]::-webkit-slider-thumb {
+      width: 20px; height: 20px; margin-top: -9.5px;
+    }
+    input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+
+    .key { min-height: 56px; }
+  }
+
+  @media (max-width: 560px) {
+    /* Two sliders side by side left each about 60px of travel on a phone. */
+    .dial { flex-basis: 100%; }
+    .dials { gap: 0 10px; }
+    .player-inner { gap: 4px; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     * { animation: none !important; transition: none !important; }
   }
