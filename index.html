@@ -6,8 +6,12 @@
 <meta name="theme-color" content="#0B0E0D">
 <meta name="color-scheme" content="dark">
 <meta name="description" content="Arco: bowed strings simulated from their physics. Cello, violin, viola, double bass and string orchestra.">
+<meta name="claude:viewport-fit-sides" content="cover">
 <title>Arco</title>
 <script>
+/* Some hosts wrap this page in their own skeleton; keep the language. */
+document.documentElement.lang = "en";
+
 /* Installed first so a failure anywhere below still leaves the listener a
    way out. One small toast, shown once; tapping it reloads. */
 (function () {
@@ -82,6 +86,8 @@ var arcoStore = {
     --mono:  ui-monospace, SFMono-Regular, "SF Mono", Menlo, "Cascadia Mono", Consolas, monospace;
 
     --bar-h: 108px;
+
+    color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
