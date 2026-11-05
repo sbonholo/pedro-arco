@@ -1,4 +1,11 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0E0D">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Arco: bowed strings simulated from their physics. Cello, violin, viola, double bass and string orchestra.">
 <title>Arco</title>
 
 <style>
@@ -54,7 +61,7 @@
   .wrap {
     max-width: 720px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 max(20px, env(safe-area-inset-right)) 0 max(20px, env(safe-area-inset-left));
   }
 
   /* ---------------------------------------------------------------- hero */
@@ -397,7 +404,11 @@
   .player-inner {
     max-width: 720px;
     margin: 0 auto;
-    padding: 12px 20px 14px;
+    /* viewport-fit=cover lets the page run under the notch and home bar,
+       so the controls keep clear of both. */
+    padding: 12px max(20px, env(safe-area-inset-right))
+             calc(14px + env(safe-area-inset-bottom))
+             max(20px, env(safe-area-inset-left));
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -573,6 +584,8 @@
     * { animation: none !important; transition: none !important; }
   }
 </style>
+</head>
+<body>
 
 <div class="wrap">
 
@@ -2846,5 +2859,5 @@
   applyFilter();
 })();
 </script>
-
-</body></html>
+</body>
+</html>
